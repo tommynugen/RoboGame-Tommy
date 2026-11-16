@@ -1261,6 +1261,27 @@ exported and imported again, with the 3D view drawn; then the
 Gamemaster's Share editor downloaded it and Import opened the exported
 layout, which passed its checks.
 
+### Sharing the whole Gamemaster
+
+`python3 -m robogame_sim.shared_gamemaster OUT.html` from `src/robogame_sim`
+writes `robogame-gamemaster.html`: the Gamemaster as one file, about 9 MB
+(the CAD meshes), that opens in any browser with nothing installed. It has
+every tab, in the same order, but only the Arena editor works there: it is
+the shared editor above, with Save, STL parts and Export. Every other tab
+is tagged "App only" in the tab bar and shown as it looks, greyed out, with
+a note at the top saying why it needs the Gamemaster app on the arena
+computer (ROS, the sim, robots, camera, BLE bridge, controllers, jobs). A
+note under the tabs says the same once, until Got it. The tabs and pages
+come from `gamemaster.html` and each tab's own page, so build it again
+after the app changes; a new tab fails the build until
+`shared_gamemaster.PAGES` says why it is off.
+
+Checked 2026-11-16: tests (`test_shared_gamemaster.py`), and in headless
+Chromium the file opened from disk with no page errors, the editor showed
+its palette and drew the 3D view (three.js served locally, as unpkg.com
+is blocked here), and the console, setup and teams tabs showed greyed out
+under their notes.
+
 Checked 2026-11-05, STL parts: in headless Chromium an 8 inch STL dropped
 on the file became a part of the same size, cells and poses as `add_part`
 makes, as did a 3 x 1 x 5 inch ASCII box with y up; it stayed after a
