@@ -75,7 +75,7 @@ real robots or arena. Skip it if this computer only runs the real game
 # Asks once whether to install Gazebo; $1 is how much disk it takes.
 decide_sim() {
     [ -n "$want_sim" ] && return
-    printf '\n%s\nIt takes %s of disk.\n' "$GAZEBO_WHY" "$1"
+    printf '\n%s\nIt needs %s.\n' "$GAZEBO_WHY" "$1"
     if ask_yes "Install Gazebo to simulate the RoboGame?"; then want_sim=1; else want_sim=0; fi
 }
 # What apt says installing these packages would take, such as "1,234 MB".
@@ -120,7 +120,7 @@ if [ "$no_ros" = 0 ] && [ "$box" = 0 ] && [ -z "$distro" ]; then
         *) if [ "$is_arch" = 1 ] && [ "${arch_ros:-0}" = 0 ]; then
                # Arch: Gazebo comes in an Ubuntu 26.04 distrobox; without
                # it, ROS 2 for Arch itself from arch4edu is lighter.
-               decide_sim "about 6 GB (an Ubuntu 26.04 container with ROS and Gazebo; ROS alone from arch4edu is about 2 GB)"
+               decide_sim "about 6 GB of disk in all (an Ubuntu 26.04 container with ROS and Gazebo), against about 2 GB for ROS alone from arch4edu"
                if [ "$want_sim" = 1 ]; then box=1; else arch_ros=1; fi
            elif [ "$is_arch" = 1 ]; then :
            else die "No ROS 2 packages for ${PRETTY_NAME:-this system}. Run again with --box (ROS in an Ubuntu distrobox) or --no-ros (the app without ROS)."
@@ -264,7 +264,7 @@ elif [ "$no_ros" = 0 ]; then
     if [ "$sim" = 1 ]; then
         gz_size="$(apt_size "ros-$distro-ros-gz")"
         echo "RoboGame size: Gazebo adds $gz_size"
-        decide_sim "${gz_size:-a few GB} more"
+        decide_sim "${gz_size:-a few GB} more disk space"
         if [ "$want_sim" = 1 ]; then
             pkg_install "ros-$distro-ros-gz"
             # Qt 6 for the Camera view card in Gazebo Jetty's side panel.
