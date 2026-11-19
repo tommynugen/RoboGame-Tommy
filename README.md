@@ -100,7 +100,7 @@ Camera view card and gamepads (Linux joydev) stay Linux only. Set
 no Python 3.10 or newer, puts the app in `%LOCALAPPDATA%\RoboGame`, makes a
 venv with numpy, OpenCV and pywebview, installs `cloudflared` with winget,
 and adds Start menu and desktop shortcuts. Saved layouts go to
-`%LOCALAPPDATA%\RoboGame\layouts`, so an update keeps them. The robot
+`%LOCALAPPDATA%\RoboGame\layouts`, so an update keeps them. The
 processes the app starts are stopped with `taskkill /T` on Windows
 (`process_group.py`), as Windows has no process groups.
 
