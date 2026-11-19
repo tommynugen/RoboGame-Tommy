@@ -1,0 +1,59 @@
+# Runs the installers on fresh machines: Ubuntu 22.04, 24.04 and 26.04
+# with ROS, Linux without ROS, and Windows. Each then starts the app and
+# asks it for /api/app.
+name: install
+on:
+  pull_request:
+    paths: [install.sh, install.ps1, scripts/desktop/**, .github/workflows/install.yml]
+  workflow_dispatch:
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["ubuntu:22.04", "ubuntu:24.04", "ubuntu:26.04"]
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: install.sh
+        run: bash install.sh --no-menu --no-cloudflared
+      - name: App starts with ROS
+        shell: bash
+        run: |
+          set +u; source /opt/ros/$(cat ~/.config/robogame/ros_distro)/setup.bash; source install/setup.bash
+          timeout 20 ros2 run robogame_sim robogame_gamemaster --no-browser > gm.log 2>&1 &
+          sleep 12; curl -sf http://localhost:8766/api/app | tee app.json
+          grep -q '"console": true' app.json || { cat gm.log; exit 1; }
+
+  no-ros:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install.sh --no-ros
+        run: bash install.sh --no-ros --no-menu --no-cloudflared
+      - name: App starts
+        run: |
+          cd src/robogame_sim
+          timeout 15 ../../.venv/bin/python -m robogame_sim.gamemaster --no-browser > gm.log 2>&1 &
+          sleep 8; curl -sf http://localhost:8766/api/app || { cat gm.log; exit 1; }
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: install.ps1
+        shell: pwsh
+        env:
+          ROBOGAME_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          irm "https://raw.githubusercontent.com/${{ github.repository }}/$env:ROBOGAME_REF/install.ps1" | iex
+      - name: App starts
+        shell: pwsh
+        run: |
+          $home_ = Join-Path $env:LOCALAPPDATA "RoboGame"
+          $p = Start-Process -PassThru -FilePath "$home_\venv\Scripts\python.exe" -ArgumentList "`"$home_\gamemaster.pyw`"", "--no-browser" -RedirectStandardError gm.log
+          Start-Sleep 10
+          Invoke-RestMethod http://localhost:8766/api/app | ConvertTo-Json -Compress
+          if (-not (Test-Path "$([Environment]::GetFolderPath('Programs'))\RoboGame Gamemaster.lnk")) { throw "no shortcut" }
+          Stop-Process $p

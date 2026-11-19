@@ -20,15 +20,27 @@ if command -v curl >/dev/null && curl -s -o /dev/null -m 1 http://localhost:8766
     exec xdg-open http://localhost:8766/
 fi
 
-ros="/opt/ros/${ROS_DISTRO:-lyrical}/setup.bash"
-[ -f "$ros" ] || { say "No ROS found at $ros."; exit 1; }
-[ -f "$repo/install/setup.bash" ] || {
-    say "Build the workspace first: colcon build --symlink-install in $repo."
-    exit 1
-}
+# Which ROS: $ROS_DISTRO, else the one install.sh used, else any found.
+distro="${ROS_DISTRO:-}"
+[ -n "$distro" ] || distro="$(cat "${XDG_CONFIG_HOME:-$HOME/.config}/robogame/ros_distro" 2>/dev/null)"
+for d in "$distro" lyrical kilted jazzy humble; do
+    [ -n "$d" ] && [ -f "/opt/ros/$d/setup.bash" ] && { distro="$d"; break; }
+done
+ros="/opt/ros/$distro/setup.bash"
+echo "--- $(date) ---" >>"$log"
+
+# No ROS: run the app from the source tree (install.sh --no-ros makes .venv).
+if [ ! -f "$ros" ] || [ ! -f "$repo/install/setup.bash" ]; then
+    py="$repo/.venv/bin/python"
+    [ -x "$py" ] || py=python3
+    if [ -f "$ros" ]; then
+        say "Not built yet: run $repo/install.sh. Starting without ROS for now."
+    fi
+    cd "$repo/src/robogame_sim"
+    exec "$py" -m robogame_sim.gamemaster >>"$log" 2>&1
+fi
 set +u
 source "$ros"
 source "$repo/install/setup.bash"
 cd "$repo"
-echo "--- $(date) ---" >>"$log"
 exec ros2 run robogame_sim robogame_gamemaster >>"$log" 2>&1

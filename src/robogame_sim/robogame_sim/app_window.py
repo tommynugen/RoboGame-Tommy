@@ -23,20 +23,31 @@ import sys
 TITLE = "RoboGame Gamemaster"
 SIZE = (1440, 900)
 BROWSERS = ("chromium", "chromium-browser", "google-chrome",
-            "google-chrome-stable", "brave-browser", "microsoft-edge")
+            "google-chrome-stable", "brave-browser", "microsoft-edge",
+            "msedge", "chrome")
+# Windows keeps Edge and Chrome off the PATH, so look where they install.
+WINDOWS_BROWSERS = (
+    r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe",
+    r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe",
+    r"%ProgramFiles%\Google\Chrome\Application\chrome.exe",
+    r"%LocalAppData%\Google\Chrome\Application\chrome.exe")
 
 
 def profile_dir():
     """The app-mode browser's own profile, kept apart from the user's own
     so the window is a process of its own that ends when it closes."""
-    cache = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    cache = (os.environ.get("XDG_CACHE_HOME") or os.environ.get("LOCALAPPDATA")
+             or os.path.expanduser("~/.cache"))
     return os.path.join(cache, "robogame", "window")
 
 
 def browser_command(url, which=shutil.which):
     """The command for an app-mode window on url, or None."""
-    for name in BROWSERS:
-        path = which(name)
+    found = [which(name) for name in BROWSERS]
+    if os.name == "nt":
+        found += [p for p in map(os.path.expandvars, WINDOWS_BROWSERS)
+                  if os.path.isfile(p)]
+    for path in found:
         if path:
             return [path, f"--app={url}", f"--user-data-dir={profile_dir()}",
                     f"--window-size={SIZE[0]},{SIZE[1]}",
@@ -73,7 +84,8 @@ def show(url):
     browser = subprocess.Popen(command, stdout=subprocess.DEVNULL,
                                stderr=subprocess.DEVNULL)
     # The Gamemaster stops this process when it quits: take the window too.
-    signal.signal(signal.SIGTERM, lambda *_: browser.terminate())
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, lambda *_: browser.terminate())
     browser.wait()
     return True
 

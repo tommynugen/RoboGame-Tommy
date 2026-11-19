@@ -6,3 +6,4 @@ __pycache__/
 src/arena_perception/
 .claude/*
 !.claude/settings.json
+.venv/
