@@ -526,8 +526,9 @@ where typing the tokens into the calculator gave 9.
 
 Checked 2026-11-19, no repeats: tests (`test_teams.py` refuses a
 multiplier used twice and the same colour for decoy and 2x), and in
-headless Chromium the phone page greys out a multiplier another zone
-has and the colour the other token has.
+headless Chromium on the phone page: tapping a picked choice again
+clears it, and picking a multiplier another zone has (or the colour the
+other token has) moves it, clearing the old pick.
 
 ## The app's Vision tab
 
