@@ -2,7 +2,7 @@
 # (if missing), the app, its Python parts and cloudflared, and a Start
 # menu and desktop shortcut. Run it again to update. In PowerShell:
 #
-#   irm https://raw.githubusercontent.com/tommynugen/RoboGames-Fall-2026/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/tommynugen/Robogame-Tommy/main/install.ps1 | iex
 #
 # or double-click install-windows.cmd. No admin rights needed.
 #
@@ -15,7 +15,7 @@ $ProgressPreference = "SilentlyContinue"
 
 # ROBOGAME_REF picks another branch, as the installer test does.
 $Ref = if ($env:ROBOGAME_REF) { $env:ROBOGAME_REF } else { "main" }
-$Zip = "https://github.com/tommynugen/RoboGames-Fall-2026/archive/refs/heads/$Ref.zip"
+$Zip = "https://github.com/tommynugen/Robogame-Tommy/archive/refs/heads/$Ref.zip"
 $Home_ = Join-Path $env:LOCALAPPDATA "RoboGame"
 $App = Join-Path $Home_ "app"
 $Venv = Join-Path $Home_ "venv"

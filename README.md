@@ -64,13 +64,13 @@ again to update.
 Ubuntu (asks for your password once):
 
 ```
-curl -fsSL https://raw.githubusercontent.com/tommynugen/RoboGames-Fall-2026/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tommynugen/Robogame-Tommy/main/install.sh | bash
 ```
 
 or `./install.sh` in a checkout. It adds the ROS apt source if there is
 none, installs `ros-DISTRO-ros-base`, `ros-gz` (24.04 and up), `joy`,
 `ros-dev-tools`, OpenCV, pywebview and `cloudflared`, clones the repo to
-`~/RoboGames-Fall-2026` (or uses the checkout it is in), builds it, and
+`~/Robogame-Tommy` (or uses the checkout it is in), builds it, and
 runs `scripts/desktop/install.sh`. Options: `--ros DISTRO`, `--no-ros`
 (a `.venv` with pip instead of ROS), `--dir PATH`, `--no-cloudflared`,
 `--no-menu`. The app menu entry finds whichever ROS is installed, or runs
@@ -79,7 +79,7 @@ without ROS from the `.venv`.
 Windows: double-click `install-windows.cmd`, or in PowerShell:
 
 ```
-irm https://raw.githubusercontent.com/tommynugen/RoboGames-Fall-2026/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/tommynugen/Robogame-Tommy/main/install.ps1 | iex
 ```
 
 No admin rights needed. It installs Python 3.12 with winget if there is
@@ -109,8 +109,8 @@ sudo apt install ros-lyrical-ros-gz
 Then clone and build:
 
 ```
-git clone https://github.com/tommynugen/RoboGames-Fall-2026.git
-cd RoboGames-Fall-2026
+git clone https://github.com/tommynugen/Robogame-Tommy.git
+cd Robogame-Tommy
 source /opt/ros/lyrical/setup.bash
 colcon build --symlink-install
 source install/setup.bash
