@@ -66,6 +66,13 @@ pkg_install() {
         *) return 1 ;;
     esac
 }
+# Fresh package lists. Arch wants a full upgrade rather than a bare -Sy.
+pkg_refresh() {
+    case "$pm" in
+        apt) need_sudo apt-get update -qq ;;
+        pacman) need_sudo pacman -Syu --noconfirm ;;
+    esac
+}
 # Optional packages: one at a time, so a missing one does not stop the rest.
 pkg_maybe() { for p in "$@"; do pkg_install "$p" >/dev/null 2>&1 || warn "  ($p not available here, skipped)"; done; }
 
@@ -120,7 +127,7 @@ get_repo() {
 # -- distrobox: Ubuntu 26.04 with ROS inside, sharing home, screen and USB -----
 if [ "$box" = 1 ]; then
     step "distrobox"
-    [ "$pm" = apt ] && need_sudo apt-get update -qq
+    pkg_refresh
     has git || pkg_install git
     if ! has distrobox || ! { has podman || has docker; }; then
         pkg_install distrobox podman || die "Install distrobox and podman, then run this again."
@@ -146,10 +153,11 @@ fi
 # -- system packages ---------------------------------------------------------
 step "System packages"
 case "$pm" in
-    apt) need_sudo apt-get update -qq
+    apt) pkg_refresh
          pkg_install git curl ca-certificates python3 python3-venv python3-pip
          pkg_maybe python3-numpy python3-opencv python3-webview libnotify-bin ;;
-    pacman) pkg_install git curl python python-pip
+    pacman) pkg_refresh
+            pkg_install git curl python python-pip
             pkg_maybe python-numpy libnotify ;;
     dnf) pkg_install git curl python3 python3-pip
          pkg_maybe python3-numpy python3-opencv python3-pywebview libnotify ;;
