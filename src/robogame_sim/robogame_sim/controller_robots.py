@@ -51,6 +51,7 @@ import math
 import os
 import re
 import signal
+import sys
 import subprocess
 
 import rclpy
@@ -98,8 +99,18 @@ def die_with_parent():
         PR_SET_PDEATHSIG, signal.SIGTERM)
 
 
+def child_options():
+    """Popen options for a child process: on Linux it dies with this one.
+    Windows has no prctl, so there the child is stopped by hand."""
+    return {"preexec_fn": die_with_parent} if sys.platform == "linux" else {}
+
+
 def executable(package, name):
-    return os.path.join(get_package_prefix(package), "lib", package, name)
+    path = os.path.join(get_package_prefix(package), "lib", package, name)
+    # Windows installs console scripts as NAME.exe.
+    if not os.path.exists(path) and os.path.exists(path + ".exe"):
+        return path + ".exe"
+    return path
 
 
 def installed(package):
@@ -575,7 +586,7 @@ class ControllerRobots(Node):
             "-r", f"/model/{robot}/tf:=/tf")
 
     def start(self, what, robot_id, *command):
-        process = subprocess.Popen(command, preexec_fn=die_with_parent)
+        process = subprocess.Popen(command, **child_options())
         self.processes.append(process)
         if what in ("sim_firmware", "bridge"):
             self.robot_processes.setdefault(robot_id, []).append(process)

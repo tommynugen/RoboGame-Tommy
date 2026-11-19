@@ -2,6 +2,8 @@
 # Adds RoboGame Gamemaster to the desktop's app menu, for this user.
 # Run it from anywhere; it fills in where this repo is. Run it again if
 # the repo moves. --remove takes the entry off again.
+# ROBOGAME_LAUNCH_PREFIX goes before the launcher in the entry, such as
+# "distrobox enter robogame --" when the app lives in a distrobox.
 set -e
 here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 apps="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
@@ -22,7 +24,7 @@ cat >"$entry" <<END
 Type=Application
 Name=RoboGame Gamemaster
 Comment=Arena editor, robot console and camera for the RoboGame sim
-Exec="$here/gamemaster.sh"
+Exec=${ROBOGAME_LAUNCH_PREFIX:+$ROBOGAME_LAUNCH_PREFIX }"$here/gamemaster.sh"
 Icon=robogame-gamemaster
 Terminal=false
 Categories=Development;Robotics;

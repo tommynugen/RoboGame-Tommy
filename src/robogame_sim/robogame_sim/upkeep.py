@@ -34,6 +34,8 @@ import subprocess
 import tempfile
 import threading
 
+from robogame_sim import process_group
+
 STOP_WAIT = 5.0  # s, from Ctrl-C to SIGKILL
 TAIL = 4000  # bytes of log sent back
 KEYS = os.path.expanduser("~/.config/onshape/keys.env")
@@ -155,10 +157,10 @@ class UpkeepRunner:
                 return self.status()
             self.stopped = True
             try:
-                os.killpg(process.pid, signal.SIGINT)
+                process_group.signal_group(process.pid, signal.SIGINT)
                 process.wait(STOP_WAIT)
             except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
+                process_group.signal_group(process.pid, process_group.KILL)
                 process.wait()
             except ProcessLookupError:
                 pass

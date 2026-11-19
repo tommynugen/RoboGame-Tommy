@@ -7,7 +7,10 @@ does, and turns its events into the axes and buttons joy_node would
 publish, so racing_teleop reads it unchanged.
 """
 
-import fcntl
+try:
+    import fcntl  # Linux only; other systems find no gamepads here
+except ImportError:
+    fcntl = None
 import glob
 import os
 import re
@@ -87,6 +90,8 @@ def find_gamepads():
     """Lists (device path, name, address, virtual) for each connected
     gamepad. The address is the Bluetooth one, upper case, or the device
     path for a controller that has none. virtual is is_virtual's."""
+    if fcntl is None:
+        return []
     pads = []
 
     for sysfs in sorted(glob.glob("/sys/class/input/js*")):
