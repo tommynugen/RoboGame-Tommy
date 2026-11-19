@@ -445,8 +445,8 @@ against Onshape or a real build.
 The Teams tab, last of the Gamemaster's tabs, signs teams up from their
 phones. It shows a QR code for the sign-up page, at this computer's
 address on its network, port 8767 (`--signup-port` to change it). A
-phone on the same Wi-Fi that scans it opens a page where the team types
-its name and how many points each token colour is worth to it, 0 to 100,
+phone on the same Wi-Fi (or any network, with the Public link below)
+that scans it opens a page where the team types its name and how many points each token colour is worth to it, 0 to 100,
 with + and - buttons, say 5 for red, 3 for blue and 1 for yellow. Sign up
 sends it. The phone keeps its team's id, so scanning again shows the team
 and Save changes edits it; Start a new team on the phone forgets it. Two
@@ -529,6 +529,47 @@ multiplier used twice and the same colour for decoy and 2x), and in
 headless Chromium on the phone page: tapping a picked choice again
 clears it, and picking a multiplier another zone has (or the colour the
 other token has) moves it, clearing the old pick.
+
+### Phones on any network: the Public link
+
+A phone on mobile data, or on another Wi-Fi, cannot reach this
+computer's own address. Tick **Public link, for phones on any network**
+under the QR code and the Gamemaster starts a Cloudflare quick tunnel
+(`cloudflared tunnel --url http://localhost:8767`): free, no account, no
+router setup. A few seconds later the QR code changes to
+`https://<random words>.trycloudflare.com/?code=<join code>`, which works
+from any phone with internet. The Wi-Fi address still works too and is
+shown under the switch. Untick it (or quit the Gamemaster) to close the
+link.
+
+Since that address is open to the whole internet, every request that
+comes through the tunnel must carry the join code, 6 letters and numbers
+made fresh each time the link starts, so an old link or a guessed
+address gets "This sign-up link has run out". The tunnel still reaches
+only the sign-up page and `/api/signup`, and the 64 team cap stays. The
+switch is POST `/api/teams/public {"on": true | false}`; the tab's state
+gains `public`, `public_up`, `public_note` and `lan_url`.
+
+It needs `cloudflared` installed once. On Ubuntu (x86-64; use
+`cloudflared-linux-arm64.deb` on a Raspberry Pi or other ARM board):
+
+```
+curl -L -o /tmp/cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i /tmp/cloudflared.deb
+```
+
+Without it the switch says "cloudflared is not installed". Quick
+tunnels are meant for testing: Cloudflare gives no uptime promise, and
+the address changes on every start, so put the QR code up after
+switching it on.
+
+Checked 2026-11-19: tests (`test_teams.py`: with a stand-in
+`cloudflared` the QR address becomes the tunnel's with the code; through
+the tunnel a missing or wrong code gets 403 and the right one 200, the
+Wi-Fi address needs none, and stopping the link turns its code away; a
+missing `cloudflared` is reported), and the tab and the sign-up page in
+headless Chromium without ROS. Not yet run with the real `cloudflared`
+or a phone on mobile data.
 
 ## The app's Vision tab
 

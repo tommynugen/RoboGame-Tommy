@@ -165,3 +165,50 @@ def test_v2_zone_ruleset_scores(tmp_path):
     assert again.multipliers == [-1, 0, 2]
     assert again.counts == {"1": {"red": 2}, "2": {"blue": 1}}
     assert again.teams[v1["id"]]["points"]["red"] == 5
+
+
+def test_public_link_needs_its_code(tmp_path):
+    """The Public link runs cloudflared (a stand-in here) and the QR code
+    shows its address; requests through it need the join code."""
+    fake = tmp_path / "cloudflared"
+    fake.write_text("#!/bin/sh\necho 'INF |  https://five-test-words."
+                    "trycloudflare.com  |' >&2\nexec sleep 30\n")
+    fake.chmod(0o755)
+    store = teams.Teams(port=0, host="127.0.0.1")
+    store.cloudflared = "no-such-cloudflared"
+    store.start_public()
+    assert store.tunnel is None and "not installed" in store.public_note
+    store.serve()
+    store.port = store.server.server_port
+    phone = f"http://127.0.0.1:{store.port}"
+
+    def ask(path, tunnel=True):
+        headers = {"Cf-Connecting-Ip": "203.0.113.5"} if tunnel else {}
+        request = urllib.request.Request(phone + path, headers=headers)
+        try:
+            with urllib.request.urlopen(request) as reply:
+                return reply.status
+        except urllib.error.HTTPError as error:
+            return error.code
+
+    try:
+        store.cloudflared = str(fake)
+        store.start_public()
+        for _ in range(100):
+            if store.public:
+                break
+            threading.Event().wait(0.05)
+        state = store.state()
+        assert state["public"] and state["public_up"]
+        code = store.code
+        assert state["url"] == ("https://five-test-words.trycloudflare.com"
+                                f"/?code={code}")
+        assert ask(f"/?code={code}") == 200
+        assert ask(f"/api/signup?code={code}") == 200
+        assert ask("/") == 403 and ask("/api/signup?code=nope") == 403
+        assert ask("/api/signup", tunnel=False) == 200  # same Wi-Fi
+        store.stop_public()
+        assert store.state()["url"].startswith("http://127.0.0.1:")
+        assert ask(f"/api/signup?code={code}") == 403
+    finally:
+        store.stop()

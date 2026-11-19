@@ -110,6 +110,15 @@ const remember = (value) => {
   } catch (error) { return null; }
 };
 const $ = (id) => document.getElementById(id);
+// The join code a public link carries, sent back with every call.
+const CODE = new URLSearchParams(location.search).get("code") || "";
+const api = (id) => {
+  const query = new URLSearchParams();
+  if (id) query.set("id", id);
+  if (CODE) query.set("code", CODE);
+  const text = query.toString();
+  return `/api/signup${text ? "?" + text : ""}`;
+};
 let teamId = remember();
 let maxPoints = 100;
 let ruleset = "V1";
@@ -207,9 +216,9 @@ const picked = (name) => {
 };
 
 async function load() {
-  const query = teamId ? `?id=${encodeURIComponent(teamId)}` : "";
-  const reply = await fetch(`/api/signup${query}`);
+  const reply = await fetch(api(teamId));
   const data = await reply.json();
+  if (!reply.ok) throw new Error(data.error || "the sign-up page is not answering");
   maxPoints = data.max_points;
   const team = data.team;
   if (teamId && !team) { teamId = null; remember(null); }
@@ -264,7 +273,7 @@ $("form").addEventListener("submit", async (event) => {
   $("send").disabled = true;
   note("Sending…");
   try {
-    const reply = await fetch("/api/signup", {
+    const reply = await fetch(api(), {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({id: teamId, name: $("name").value,
                             ...(ruleset === "V2" ? {picks} : {points})}),
@@ -294,7 +303,8 @@ $("fresh").addEventListener("click", (event) => {
   load();
 });
 
-load().catch(() => note("Could not reach the game. Are you on the same Wi-Fi?", "bad"));
+load().catch((error) => note(error.message.includes("run out") ? error.message
+  : "Could not reach the game. Scan the QR code again.", "bad"));
 </script>
 </body>
 </html>
