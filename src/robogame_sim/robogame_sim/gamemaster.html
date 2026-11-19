@@ -131,6 +131,7 @@
     <span class="badge" id="errors" hidden></span></a>
   <a href="#upkeep" data-tab="upkeep" title="Upkeep (Alt+7)">Upkeep</a>
   <a href="#teams" data-tab="teams" title="Teams (Alt+8)">Teams</a>
+  <a href="#gazebo" data-tab="gazebo" title="Gazebo (Alt+9)">Gazebo</a>
   <div id="status" aria-live="polite">
     <button class="chip" id="ros" data-go="console">ROS</button>
     <button class="chip" id="sim" data-go="editor">Sim</button>
@@ -201,7 +202,7 @@ function remember(key, value) {
 let current = null;
 
 // #setup, #editor, #editor/NAME (opens that layout), #console, #vision,
-// #chase, #logs, #upkeep or #teams. With none, the tab shown last, or Setup.
+// #chase, #logs, #upkeep, #teams or #gazebo. With none, the tab shown last, or Setup.
 function show() {
   const [asked, layout] = decodeURIComponent(location.hash.slice(1))
     .split("/");
@@ -226,7 +227,7 @@ function show() {
   for (const link of links) {
     if (link.dataset.tab === tab) {
       link.setAttribute("aria-current", "page");
-      // Alt+8 and the chips can show a tab scrolled out of the bar.
+      // Alt+9 and the chips can show a tab scrolled out of the bar.
       link.scrollIntoView({ block: "nearest", inline: "nearest" });
     } else link.removeAttribute("aria-current");
   }
@@ -296,7 +297,7 @@ function paint(app) {
          "Gazebo is starting. Open the Arena editor to stop it.");
   } else if (sim.running) {
     chip("sim", `Sim: ${sim.layout}`, "good",
-         "Gazebo runs this layout. Open the Arena editor to stop it.");
+         "Gazebo runs this layout. Open the Gazebo tab to see it.");
   } else if (sim.exit && !sim.stopped) {
     chip("sim", "Sim stopped", "bad",
          `The last sim run ended with code ${sim.exit}. See Logs.`);
@@ -306,7 +307,8 @@ function paint(app) {
   }
   // A failed run's chip opens its output; the others the Launch buttons.
   document.getElementById("sim").dataset.go =
-    sim && sim.exit && !sim.running && !sim.stopped ? "logs" : "editor";
+    sim && sim.exit && !sim.running && !sim.stopped ? "logs"
+    : sim && sim.running ? "gazebo" : "editor";
 
   // The BLE bridge to the real robots, shown once it is started.
   const bridge = app.bridge;

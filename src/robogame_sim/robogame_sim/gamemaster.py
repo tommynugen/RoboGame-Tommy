@@ -27,6 +27,10 @@ Serves http://localhost:8766 with these tabs, and the Setup tab:
   and how many points each token colour is worth to it, and the teams so
   far. The sign-up page is open to the network on port 8767 and the teams
   go out on /game/teams. teams.py, teams.html and signup.html.
+- Gazebo (#gazebo): the running Gazebo world drawn live in the app, with
+  Play, Pause, Step and Reset, and Start and Stop for a sim with no
+  Gazebo window. Says how to get Gazebo when it is not installed.
+  sim_view.py and gazebo.html.
 - Upkeep (#upkeep): the repo's jobs, the Onshape export, the
   arena_perception copy and the colcon build, with their output.
   upkeep.py and upkeep.html.
@@ -35,7 +39,7 @@ Right of the tabs a status bar shows, every 2 s from GET /api/app,
 whether ROS is on, the sim's state, the BLE bridge's, how many robots
 the console sees and the arena in use; each opens the tab that deals with it. The Logs tab
 counts the errors not yet looked at, and a new one pops up in a corner
-while another tab shows. Alt+1 to Alt+8 switch tabs, and a bare URL
+while another tab shows. Alt+1 to Alt+9 switch tabs, and a bare URL
 opens the tab shown last.
 
 Both tabs are live at once, so a layout saved in the editor is the one the
@@ -67,6 +71,7 @@ from robogame_sim import (app_log, app_window, arena_editor, perception,
 from robogame_sim.chase_runs import ChaseRunner
 from robogame_sim.ble_bridge import BridgeRunner
 from robogame_sim.sim_runner import SimRunner
+from robogame_sim.sim_view import GazeboView
 from robogame_sim.upkeep import UpkeepRunner
 
 HERE = os.path.dirname(os.path.realpath(__file__))
@@ -79,8 +84,9 @@ VISION_PAGE = os.path.join(HERE, vision_tab.PAGE_NAME)
 UPKEEP_PAGE = os.path.join(HERE, "upkeep.html")
 CHASE_PAGE = os.path.join(HERE, "chase.html")
 SETUP_PAGE = os.path.join(HERE, "setup.html")
+GAZEBO_PAGE = os.path.join(HERE, "gazebo.html")
 TABS = ("setup", "editor", "console", "vision", "chase", "logs", "upkeep",
-        "teams")
+        "teams", "gazebo")
 # Changes the editor makes as it is used, not worth a log line each.
 QUIET = ("/api/check",)
 PORT = 8766
@@ -96,7 +102,7 @@ the app again. The arena editor works without it.</p>"""
 
 def handler(console=None, sim=None, book=None, bridge=None, vision=None,
             upkeep=None, chase=None, tags=None, nodes=None, quit=None,
-            teams=None):
+            teams=None, gazebo=None):
     """A request handler for the app. console is the RobotConsole node, or
     None to serve the editor alone. sim is the SimRunner behind the
     editor's Launch buttons, or None for none. book is the LogBook the
@@ -108,13 +114,15 @@ def handler(console=None, sim=None, book=None, bridge=None, vision=None,
     (perception.TagRobots) and nodes arena_perception's nodes
     (perception.Perception). quit, called with no arguments, stops the
     app, for the Quit button: POST /api/quit. teams is the Teams tab's
-    teams_tab.Teams."""
+    teams_tab.Teams. gazebo is the Gazebo tab's GazeboView, made on sim
+    when None."""
     book = book or app_log.LogBook()
     vision = vision or vision_tab.Vision(book)
     tags = tags or perception.TagRobots(
         side=lambda: vision.settings["arena_cm"], book=book)
     nodes = nodes or perception.Perception(book=book)
     teams = teams or teams_tab.Teams(book=book)
+    gazebo = gazebo or GazeboView(sim)
     if console is not None:
         from robogame_sim import robot_console
         console_page = robot_console.PAGE
@@ -200,6 +208,8 @@ def handler(console=None, sim=None, book=None, bridge=None, vision=None,
                 return self.file(SETUP_PAGE, HTML)
             if path == "/teams":
                 return self.file(teams_tab.TAB_PAGE, HTML)
+            if path == "/gazebo":
+                return self.file(GAZEBO_PAGE, HTML)
             if path == "/vision/stream.mjpg":
                 return self.stream()
             if path == "/api/app":
@@ -210,6 +220,7 @@ def handler(console=None, sim=None, book=None, bridge=None, vision=None,
             source = self.answer(
                 ("app", lambda: book.get(self.path)),
                 ("sim", lambda: sim and sim.get(path)),
+                ("sim", lambda: gazebo.get(self.path)),
                 ("bridge", lambda: bridge and bridge.get(path)),
                 ("upkeep", lambda: upkeep and upkeep.get(path)),
                 ("vision", lambda: vision.get(path)),
@@ -274,6 +285,7 @@ def handler(console=None, sim=None, book=None, bridge=None, vision=None,
                 return
             self.note(self.answer(
                 ("sim", lambda: sim and sim.post(path, self.read_body)),
+                ("sim", lambda: gazebo.post(path, self.read_body)),
                 ("bridge", lambda: bridge and bridge.post(
                     path, self.read_body)),
                 ("upkeep", lambda: upkeep and upkeep.post(

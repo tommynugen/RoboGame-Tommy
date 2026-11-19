@@ -41,6 +41,8 @@ PAGES = {
                "copy of the repo."),
     "teams": ("teams.html", "Team sign-up is served to phones from the "
               "arena computer, over its network."),
+    "gazebo": ("gazebo.html", "The Gazebo tab shows the sim that Gazebo "
+               "runs on the arena computer."),
 }
 
 # Put first in an off tab's page: its calls to the app get an answer that
