@@ -12,7 +12,7 @@ JSON, latched) for any ROS node that keeps score:
                 "yellow": 1}, "updated": 1730900000.0}]}
 
 That is ruleset V1. In ruleset V2 a team instead gives each of the three
-zones a multiplier (from the Gamemaster's choices, 2x, 0x and -1x at
+zones a different multiplier (from the Gamemaster's choices, 2x, 0x and -1x at
 first, shown in the order the Gamemaster sets), picks one colour as its
 decoy (worth -1 a token) and another as its 2x token (worth 2); every
 other colour is worth 1. The Gamemaster enters how many tokens of each
@@ -82,8 +82,9 @@ def parse_multipliers(given, strict=False):
                                  f"to {MAX_MULTIPLIER}")
             if value not in clean:
                 clean.append(value)
-        if not clean:
-            raise ValueError("give at least one multiplier")
+        if len(clean) < len(ZONES):
+            raise ValueError(f"give at least {len(ZONES)} multipliers, one "
+                             "for each zone")
         return clean
     except ValueError:
         if strict:
@@ -294,6 +295,9 @@ class Teams:
             if value not in self.multipliers:
                 raise ValueError(f"zone {number}: pick one of " + ", ".join(
                     f"{m}x" for m in self.multipliers))
+            if value in clean:
+                raise ValueError(f"zone {number}: {value}x is already used; "
+                                 "give each zone a different multiplier")
             clean.append(value)
         decoy, double = given.get("decoy"), given.get("double")
         for colour, what in ((decoy, "decoy"), (double, "2x token")):

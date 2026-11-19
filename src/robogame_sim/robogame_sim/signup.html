@@ -51,6 +51,7 @@
     border: 1px solid var(--line); border-radius: 10px; font-size: 17px;
     text-transform: capitalize; min-height: 48px;
   }
+  .pick label:has(input:disabled) { opacity: .35; }
   .pick label:has(input:checked) { border-color: var(--accent); outline: 2px solid var(--accent); }
   .token {
     display: grid; grid-template-columns: 28px 1fr 44px 64px 44px;
@@ -171,6 +172,25 @@ function dotFor(colour) {
   return dot;
 }
 
+// No repeats: a multiplier one zone has, or the colour the other token
+// has, cannot be picked again.
+function lockTaken() {
+  const zoneInputs = [...document.querySelectorAll("#zones input")];
+  const zoneTaken = zoneInputs.filter((i) => i.checked);
+  for (const input of zoneInputs) {
+    input.disabled = zoneTaken.some((t) => t.name !== input.name && t.value === input.value);
+  }
+  for (const [name, other] of [["decoy", "double"], ["double", "decoy"]]) {
+    const taken = picked(other);
+    for (const input of document.querySelectorAll(`input[name="${name}"]`)) {
+      input.disabled = input.value === taken;
+    }
+  }
+}
+document.addEventListener("change", (event) => {
+  if (event.target.type === "radio") lockTaken();
+});
+
 const picked = (name) => {
   const input = document.querySelector(`input[name="${name}"]:checked`);
   return input ? input.value : null;
@@ -210,6 +230,7 @@ async function load() {
   });
   choices($("decoy"), "decoy", data.colours, picks ? picks.decoy : null, "colour");
   choices($("double"), "double", data.colours, picks ? picks.double : null, "colour");
+  lockTaken();
   if (team) {
     $("name").value = team.name;
     $("send").textContent = "Save changes";
