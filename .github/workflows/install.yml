@@ -21,10 +21,29 @@ jobs:
       - uses: actions/checkout@v4
       - name: install.sh
         run: bash install.sh --no-menu --no-cloudflared
+      - name: Disk used by ROS and Gazebo
+        run: du -sh /opt/ros
       - name: App starts with ROS
         shell: bash
         run: |
           set +u; source /opt/ros/$(cat ~/.config/robogame/ros_distro)/setup.bash; source install/setup.bash
+          timeout 20 ros2 run robogame_sim robogame_gamemaster --no-browser > gm.log 2>&1 &
+          sleep 12; curl -sf http://localhost:8766/api/app | tee app.json
+          grep -q '"console": true' app.json || { cat gm.log; exit 1; }
+
+  ubuntu-no-sim:
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: install.sh --no-sim
+        run: bash install.sh --no-sim --no-menu --no-cloudflared
+      - name: Disk used by ROS
+        run: du -sh /opt/ros
+      - name: App starts with ROS
+        shell: bash
+        run: |
+          set +u; source /opt/ros/lyrical/setup.bash; source install/setup.bash
           timeout 20 ros2 run robogame_sim robogame_gamemaster --no-browser > gm.log 2>&1 &
           sleep 12; curl -sf http://localhost:8766/api/app | tee app.json
           grep -q '"console": true' app.json || { cat gm.log; exit 1; }
@@ -36,6 +55,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: install.sh --arch4edu (ROS 2 for Arch itself)
         run: bash install.sh --arch4edu --no-menu --no-cloudflared
+      - name: Disk used by ROS
+        run: du -sh /opt/ros
       - name: App starts with ROS
         shell: bash
         run: |
@@ -50,6 +71,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: install.sh --box
         run: bash install.sh --box --no-menu --no-cloudflared
+      - name: Disk used by the box
+        run: podman system df
       - name: App starts with ROS in the box
         run: |
           distrobox enter robogame -- bash -c 'set +u; source /opt/ros/lyrical/setup.bash; source install/setup.bash; timeout 25 ros2 run robogame_sim robogame_gamemaster --no-browser' > gm.log 2>&1 &

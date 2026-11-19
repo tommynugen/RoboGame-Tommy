@@ -18,6 +18,9 @@
 #   --box              ROS and Gazebo in an Ubuntu 26.04 distrobox (the default
 #                      on Arch; also Fedora or any Linux with distrobox)
 #   --arch4edu         Arch: ROS 2 from the arch4edu repo instead, no Gazebo
+#   --sim / --no-sim   install the Gazebo simulator or not, without asking
+#                      (it asks when run in a terminal; the answer is yes when
+#                      there is nobody to ask)
 #   --no-ros           no ROS at all: the app in a Python venv, for any Linux
 #                      (editor, vision, teams and chase tabs; no robot console)
 #   --dir PATH         where to put the repo (default ~/Robogame-Tommy)
@@ -32,18 +35,21 @@ dir=""
 distro=""
 no_ros=0
 box=0
+want_sim=""
 cloudflared=1
 menu=1
 while [ $# -gt 0 ]; do
     case "$1" in
         --ros) distro="$2"; shift ;;
         --no-ros) no_ros=1 ;;
-        --box) box=1 ;;
-        --arch4edu) arch_ros=1 ;;
+        --box) box=1; want_sim=1 ;;
+        --sim) want_sim=1 ;;
+        --no-sim) want_sim=0 ;;
+        --arch4edu) arch_ros=1; want_sim=0 ;;
         --dir) dir="$2"; shift ;;
         --no-cloudflared) cloudflared=0 ;;
         --no-menu) menu=0 ;;
-        -h|--help) sed -n '2,27p' "$0" 2>/dev/null || true; exit 0 ;;
+        -h|--help) sed -n '2,31p' "$0" 2>/dev/null || true; exit 0 ;;
         *) echo "Unknown option $1 (try --help)"; exit 2 ;;
     esac
     shift
@@ -54,6 +60,29 @@ warn() { printf '\033[1;33m%s\033[0m\n' "$1"; }
 die() { printf '\033[1;31m%s\033[0m\n' "$1"; exit 1; }
 need_sudo() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
 has() { command -v "$1" >/dev/null; }
+# A yes/no question on the terminal. With no terminal (curl | bash in a
+# script, CI) the answer is yes.
+ask_yes() {
+    local reply=""
+    { printf '%s [Y/n] ' "$1" >/dev/tty && read -r reply </dev/tty; } 2>/dev/null || { echo; return 0; }
+    case "$reply" in [nN]*) return 1 ;; esac
+    return 0
+}
+GAZEBO_WHY="Gazebo is the 3D simulator. With it you can launch arenas from the
+editor, drive simulated robots and try the chase and autonomy without the
+real robots or arena. Skip it if this computer only runs the real game
+(robot console, camera, teams); you can add it later with --sim."
+# Asks once whether to install Gazebo; $1 is how much disk it takes.
+decide_sim() {
+    [ -n "$want_sim" ] && return
+    printf '\n%s\nIt takes %s of disk.\n' "$GAZEBO_WHY" "$1"
+    if ask_yes "Install Gazebo to simulate the RoboGame?"; then want_sim=1; else want_sim=0; fi
+}
+# What apt says installing these packages would take, such as "1,234 MB".
+apt_size() {
+    LANG=C apt-get install --assume-no "$@" 2>/dev/null \
+        | sed -n 's/^After this operation, \(.*\) of additional disk space.*/\1/p' || true
+}
 
 # Package manager: apt (Ubuntu, Debian), pacman (Arch) or dnf (Fedora).
 if has apt-get; then pm=apt
@@ -88,7 +117,12 @@ if [ "$no_ros" = 0 ] && [ "$box" = 0 ] && [ -z "$distro" ]; then
         ubuntu:26.04) distro=lyrical ;;
         ubuntu:24.04) distro=jazzy ;;
         ubuntu:22.04) distro=humble ;;
-        *) if [ "$is_arch" = 1 ]; then [ "${arch_ros:-0}" = 1 ] || box=1
+        *) if [ "$is_arch" = 1 ] && [ "${arch_ros:-0}" = 0 ]; then
+               # Arch: Gazebo comes in an Ubuntu 26.04 distrobox; without
+               # it, ROS 2 for Arch itself from arch4edu is lighter.
+               decide_sim "about 6 GB (an Ubuntu 26.04 container with ROS and Gazebo; ROS alone from arch4edu is about 2 GB)"
+               if [ "$want_sim" = 1 ]; then box=1; else arch_ros=1; fi
+           elif [ "$is_arch" = 1 ]; then :
            else die "No ROS 2 packages for ${PRETTY_NAME:-this system}. Run again with --box (ROS in an Ubuntu distrobox) or --no-ros (the app without ROS)."
            fi ;;
     esac
@@ -174,7 +208,7 @@ if [ "$box" = 1 ]; then
     if ! distrobox list 2>/dev/null | grep -qw "$BOX"; then
         distrobox create --yes --name "$BOX" --image "$BOX_IMAGE"
     fi
-    flags=(--dir "$dir" --no-menu)
+    flags=(--dir "$dir" --no-menu --sim)
     [ "$cloudflared" = 1 ] || flags+=(--no-cloudflared)
     # The box shares home, so the repo and its build are the same folder.
     distrobox enter "$BOX" -- bash "$dir/install.sh" "${flags[@]}"
@@ -223,11 +257,23 @@ elif [ "$no_ros" = 0 ]; then
         need_sudo apt-get update -qq
     fi
     pkgs="ros-dev-tools ros-$distro-ros-base ros-$distro-joy"
-    [ "$sim" = 1 ] && pkgs="$pkgs ros-$distro-ros-gz"
+    # shellcheck disable=SC2086
+    echo "RoboGame size: ROS 2 ${distro^} takes $(apt_size $pkgs)"
     # shellcheck disable=SC2086
     pkg_install $pkgs
-    # Qt 6 for the Camera view card in Gazebo Jetty's side panel.
-    [ "$distro" = lyrical ] && pkg_maybe qt6-base-dev qt6-declarative-dev
+    if [ "$sim" = 1 ]; then
+        gz_size="$(apt_size "ros-$distro-ros-gz")"
+        echo "RoboGame size: Gazebo adds $gz_size"
+        decide_sim "${gz_size:-a few GB} more"
+        if [ "$want_sim" = 1 ]; then
+            pkg_install "ros-$distro-ros-gz"
+            # Qt 6 for the Camera view card in Gazebo Jetty's side panel.
+            [ "$distro" = lyrical ] && pkg_maybe qt6-base-dev qt6-declarative-dev
+        else
+            sim=0
+            echo "Skipping Gazebo. Run this again with --sim to add it."
+        fi
+    fi
 fi
 
 # -- cloudflared (Teams tab's public sign-up link) ---------------------------
