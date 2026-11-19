@@ -26,13 +26,22 @@ zones aside. Scores go out on /game/teams too, with the ruleset.
 Only the sign-up page and its one API are open to the network; the rest
 of the Gamemaster stays on this computer. A phone keeps its team's id,
 so scanning again edits the same team.
+
+Phones off this computer's Wi-Fi (on mobile data, say) sign up through a
+public link: the tab's "Public link" switch starts a Cloudflare quick
+tunnel (cloudflared, free, no account) to the sign-up server, and the QR
+code then shows its https://....trycloudflare.com address with a join
+code. Requests that come through the tunnel need that code, and each
+start makes a new one, so an old link stops working.
 """
 
 import json
 import os
 import re
 import secrets
+import shutil
 import socket
+import subprocess
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -59,6 +68,8 @@ MAX_MULTIPLIER = 10  # a multiplier choice is -10 to 10
 MAX_COUNT = 99  # tokens of one colour in one zone, at most
 COLOUR = re.compile(r"^[a-z]{3,20}$")  # a CSS colour name
 HTML = "text/html; charset=utf-8"
+# The address cloudflared prints once its quick tunnel is up.
+TUNNEL_URL = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
 
 
 def parse_multipliers(given, strict=False):
@@ -190,6 +201,12 @@ class Teams:
         self.publish = None
         self.server = None
         self.error = None
+        # The public link: cloudflared's process, its address, the join code
+        self.cloudflared = "cloudflared"
+        self.tunnel = None
+        self.public = None
+        self.code = None
+        self.public_note = ""
         self.load()
 
     def say(self, text, level="info"):
@@ -466,12 +483,82 @@ class Teams:
 
     # The Gamemaster's routes, for the Teams tab
 
-    def url(self):
+    def lan_url(self):
         return f"http://{self.host or lan_address()}:{self.port}/"
+
+    def url(self):
+        """The QR code's address: the public link while it is up."""
+        if self.public:
+            return f"{self.public}/?code={self.code}"
+        return self.lan_url()
+
+    # The public link, for phones on any network
+
+    def start_public(self):
+        if self.tunnel is not None:
+            return
+        program = shutil.which(self.cloudflared)
+        if program is None:
+            self.public_note = ("cloudflared is not installed; see the "
+                                "README's Teams section")
+            self.say(f"Public link is off: {self.public_note}.", "error")
+            return
+        self.code = secrets.token_hex(3)
+        self.public = None
+        self.public_note = "Starting…"
+        self.tunnel = subprocess.Popen(
+            [program, "tunnel", "--no-autoupdate", "--url",
+             f"http://localhost:{self.port}"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE, text=True)
+        threading.Thread(target=self.watch_tunnel, args=(self.tunnel,),
+                         daemon=True).start()
+
+    def watch_tunnel(self, tunnel):
+        """Reads cloudflared's log for its address, then waits it out."""
+        last = ""
+        for line in tunnel.stderr:
+            found = TUNNEL_URL.search(line)
+            if found and self.tunnel is tunnel and not self.public:
+                self.public = found.group(0)
+                self.public_note = ""
+                self.say(f"Public sign-up link on {self.url()}")
+            elif line.strip():
+                last = line.strip()[-160:]
+        tunnel.wait()
+        if self.tunnel is tunnel:  # it ended by itself
+            self.tunnel = self.public = None
+            self.public_note = f"cloudflared stopped: {last or 'no reason'}"
+            self.say(f"Public link is off: {self.public_note}", "error")
+
+    def stop_public(self):
+        tunnel, self.tunnel = self.tunnel, None
+        self.public = None
+        self.public_note = ""
+        if tunnel is not None:
+            tunnel.terminate()
+            try:
+                tunnel.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                tunnel.kill()
+            self.say("Public link off; phones must be on this Wi-Fi.")
+
+    def allows(self, headers, query):
+        """Whether a phone's request may go ahead. One that came through
+        the tunnel (cloudflared adds Cf-Connecting-Ip) needs the code."""
+        if headers.get("Cf-Connecting-Ip") is None:
+            return True
+        given = parse_qs(query).get("code", [""])[0]
+        code = self.code if self.tunnel is not None else None
+        return bool(code) and secrets.compare_digest(given, code)
 
     def state(self):
         with self.lock:
-            return {"url": self.url(), "tokens": list(self.tokens),
+            return {"url": self.url(), "lan_url": self.lan_url(),
+                    "public": self.tunnel is not None,
+                    "public_up": bool(self.public),
+                    "public_note": self.public_note,
+                    "tokens": list(self.tokens),
                     "ruleset": self.ruleset, "rulesets": list(RULESETS),
                     "multipliers": list(self.multipliers),
                     "v2_colours": list(self.v2_colours),
@@ -506,6 +593,12 @@ class Teams:
             if path == "/api/teams/remove":
                 self.remove(read_body().get("id"))
                 return 200, self.state()
+            if path == "/api/teams/public":
+                if read_body().get("on"):
+                    self.start_public()
+                else:
+                    self.stop_public()
+                return 200, self.state()
             if path == "/api/teams/clear":
                 self.clear()
                 return 200, self.state()
@@ -530,10 +623,16 @@ class Teams:
         self.say(f"Phone sign-up on {self.url()}")
 
     def stop(self):
+        self.stop_public()
         if self.server is not None:
             self.server.shutdown()
             self.server.server_close()
             self.server = None
+
+
+DENIED = (b"<!doctype html><meta name=viewport content='width=device-width'>"
+          b"<p style='font:18px sans-serif;margin:2em'>This sign-up link has "
+          b"run out. Scan the QR code on the Gamemaster again.</p>")
 
 
 def signup_handler(teams):
@@ -557,6 +656,11 @@ def signup_handler(teams):
 
         def do_GET(self):
             url = urlsplit(self.path)
+            if not teams.allows(self.headers, url.query):
+                if url.path == "/api/signup":
+                    return self.reply(403, {"error": "this link has run "
+                                            "out; scan the QR code again"})
+                return self.reply(403, DENIED, HTML)
             if url.path in ("/", "/index.html"):
                 with open(SIGNUP_PAGE, "rb") as file:
                     return self.reply(200, file.read(), HTML)
@@ -575,8 +679,12 @@ def signup_handler(teams):
             self.reply(404, {"error": "not found"})
 
         def do_POST(self):
-            if urlsplit(self.path).path != "/api/signup":
+            url = urlsplit(self.path)
+            if url.path != "/api/signup":
                 return self.reply(404, {"error": "not found"})
+            if not teams.allows(self.headers, url.query):
+                return self.reply(403, {"error": "this link has run out; "
+                                        "scan the QR code again"})
             try:
                 length = int(self.headers.get("Content-Length", 0))
                 if length > 4096:

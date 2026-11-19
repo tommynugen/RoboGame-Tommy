@@ -82,8 +82,11 @@
     <div id="qr"><img alt="QR code for the sign-up page" src="/api/teams/qr.svg"></div>
     <div id="url"></div>
     <p id="serving"></p>
-    <p>Phones must be on the same Wi-Fi as this computer. A team can scan
-      again to change its name or points.</p>
+    <label class="row"><input type="checkbox" id="public"> Public link,
+      for phones on any network</label>
+    <p id="public-note"></p>
+    <p id="how">Phones must be on the same Wi-Fi as this computer, or turn
+      on Public link. A team can scan again to change its name or points.</p>
   </section>
   <div class="side">
   <section>
@@ -142,6 +145,7 @@
 const $ = (id) => document.getElementById(id);
 let last = null;
 let shownUrl = null;
+let busy = false;  // a Public link switch is on its way
 
 async function call(path, body) {
   const reply = await fetch(path, {
@@ -171,6 +175,10 @@ function paint(state) {
   $("serving").textContent = state.serving ? ""
     : `Phone sign-up is off: ${state.error || "not started"}.`;
   $("serving").className = state.serving ? "" : "bad";
+  if (!busy) $("public").checked = state.public;
+  $("public-note").textContent = state.public_note
+    || (state.public_up ? `Works on mobile data too. On this Wi-Fi: ${state.lan_url}` : "");
+  $("public-note").className = !state.public && state.public_note ? "bad" : "";
   const v2 = state.ruleset === "V2";
   const typing = (id) => document.activeElement === $(id);
   if (!typing("ruleset")) $("ruleset").value = state.ruleset;
@@ -351,6 +359,14 @@ $("calc-clear").addEventListener("click", async () => {
 $("clear").addEventListener("click", async () => {
   if (!await askYes("Remove every team?", "Remove all", true)) return;
   try { paint(await call("/api/teams/clear", {})); } catch (error) {}
+});
+$("public").addEventListener("change", async () => {
+  busy = true;
+  try {
+    const state = await call("/api/teams/public", { on: $("public").checked });
+    busy = false;
+    paint(state);
+  } catch (error) { busy = false; $("public-note").textContent = error.message; }
 });
 poll();
 </script>
