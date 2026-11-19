@@ -10,12 +10,13 @@
 #   Ubuntu 26.04  ROS 2 Lyrical + Gazebo Jetty     (what the sim is built on)
 #   Ubuntu 24.04  ROS 2 Jazzy + Gazebo Harmonic    (no Camera view card)
 #   Ubuntu 22.04  ROS 2 Humble, no Gazebo sim      (editor, console, robots)
-#   Arch Linux    Ubuntu 26.04 in a distrobox      (the same as 26.04)
+#   Arch Linux    ROS 2 from arch4edu, no Gazebo   (editor, console, robots)
+#                 or --box: Ubuntu 26.04 in a distrobox (the same as 26.04)
 #
 # Options:
 #   --ros DISTRO       pick the ROS 2 distro yourself (lyrical, kilted, jazzy, humble)
-#   --box              ROS in an Ubuntu 26.04 distrobox (the default on Arch;
-#                      also for Fedora and other Linux with distrobox)
+#   --box              ROS and Gazebo in an Ubuntu 26.04 distrobox (Arch, if
+#                      arch4edu has no ROS 2, Fedora, any Linux with distrobox)
 #   --no-ros           no ROS at all: the app in a Python venv, for any Linux
 #                      (editor, vision, teams and chase tabs; no robot console)
 #   --dir PATH         where to put the repo (default ~/Robogame-Tommy)
@@ -85,14 +86,45 @@ if [ "$no_ros" = 0 ] && [ "$box" = 0 ] && [ -z "$distro" ]; then
         ubuntu:26.04) distro=lyrical ;;
         ubuntu:24.04) distro=jazzy ;;
         ubuntu:22.04) distro=humble ;;
-        *) if [ "$is_arch" = 1 ]; then box=1
+        *) if [ "$is_arch" = 1 ]; then arch_ros=1
            else die "No ROS 2 packages for ${PRETTY_NAME:-this system}. Run again with --box (ROS in an Ubuntu distrobox) or --no-ros (the app without ROS)."
            fi ;;
     esac
 fi
+arch_ros="${arch_ros:-0}"
+
+# Arch: ROS 2 binaries from arch4edu (github.com/arch4edu/arch4edu), the
+# newest distro it has. If it has none, ROS goes in a distrobox instead.
+if [ "$arch_ros" = 1 ]; then
+    step "arch4edu (ROS 2 for Arch)"
+    if ! grep -q '^\[arch4edu\]' /etc/pacman.conf; then
+        need_sudo pacman-key --init >/dev/null 2>&1 || true
+        if ! need_sudo pacman-key --recv-keys 7931B6D628C8D3BA; then
+            # No key server: the keyring package, checked against its hash.
+            curl -fsSL -o /tmp/arch4edu-keyring.pkg.tar.zst \
+                https://mirrors.tuna.tsinghua.edu.cn/arch4edu/any/arch4edu-keyring-20200805-1-any.pkg.tar.zst
+            echo "a6abbb16e57bb9065689f5b5391c945e35e256f2e6dbfa11476fdfe880f72775  /tmp/arch4edu-keyring.pkg.tar.zst" | sha256sum -c -
+            need_sudo pacman -U --noconfirm /tmp/arch4edu-keyring.pkg.tar.zst
+        fi
+        need_sudo pacman-key --lsign-key 7931B6D628C8D3BA
+        printf '\n[arch4edu]\nServer = https://repository.arch4edu.org/$arch\nServer = https://mirrors.cicku.me/arch4edu/$arch\n' \
+            | need_sudo tee -a /etc/pacman.conf >/dev/null
+    fi
+    pkg_refresh
+    available="$(pacman -Sl arch4edu 2>/dev/null | awk '{print $2}')"
+    for d in lyrical kilted jazzy humble; do
+        for name in "ros2-$d-base" "ros2-$d"; do
+            if echo "$available" | grep -qx "$name"; then distro=$d; ros_pkg=$name; break 2; fi
+        done
+    done
+    if [ -z "$distro" ]; then
+        warn "arch4edu has no ROS 2 right now; putting ROS in an Ubuntu distrobox instead."
+        arch_ros=0; box=1
+    fi
+fi
 [ "$box" = 1 ] && no_ros=0
 case "$distro" in
-    lyrical|kilted|jazzy) sim=1 ;;
+    lyrical|kilted|jazzy) [ "$arch_ros" = 1 ] && sim=0 || sim=1 ;;
     *) sim=0 ;;
 esac
 arch="$(dpkg --print-architecture 2>/dev/null || uname -m)"
@@ -103,8 +135,12 @@ elif [ "$no_ros" = 1 ]; then
     echo "Installing RoboGame Gamemaster without ROS."
 else
     echo "Installing RoboGame Gamemaster on ${PRETTY_NAME:-Linux} with ROS 2 ${distro^}."
-    [ "$sim" = 1 ] || warn "The Gazebo sim needs Ubuntu 24.04 or newer; Humble gets the app without it."
-    [ "$pm" = apt ] || die "ROS 2 packages need Ubuntu; use --box or --no-ros here."
+    if [ "$arch_ros" = 1 ]; then
+        warn "No Gazebo sim from arch4edu; run with --box for ROS and Gazebo in an Ubuntu distrobox."
+    else
+        [ "$sim" = 1 ] || warn "The Gazebo sim needs Ubuntu 24.04 or newer; Humble gets the app without it."
+        [ "$pm" = apt ] || die "ROS 2 packages need Ubuntu; use --box or --no-ros here."
+    fi
 fi
 
 get_repo() {
@@ -165,7 +201,11 @@ case "$pm" in
 esac
 
 # -- ROS 2 and Gazebo --------------------------------------------------------
-if [ "$no_ros" = 0 ]; then
+if [ "$arch_ros" = 1 ]; then
+    step "ROS 2 ${distro^} (arch4edu)"
+    pkg_install "$ros_pkg"
+    pkg_maybe python-colcon-common-extensions "ros2-$distro-joy"
+elif [ "$no_ros" = 0 ]; then
     step "ROS 2 ${distro^}"
     # Add the ROS apt source unless this machine already has one.
     if ! dpkg -s ros2-apt-source >/dev/null 2>&1 \
@@ -220,8 +260,8 @@ if [ "$no_ros" = 0 ]; then
     set -u
     # The Camera view card (robogame_gui) needs Gazebo Jetty's Qt 6; on
     # anything else, or if it fails, build the rest without it.
-    if [ "$distro" != lyrical ] || ! colcon build --symlink-install; then
-        [ "$distro" = lyrical ] && warn "The Camera view card did not build; building the rest without it."
+    if [ "$distro" != lyrical ] || [ "$sim" = 0 ] || ! colcon build --symlink-install; then
+        [ "$distro" = lyrical ] && [ "$sim" = 1 ] && warn "The Camera view card did not build; building the rest without it."
         colcon build --symlink-install --packages-skip robogame_gui
     fi
     mkdir -p "$HOME/.config/robogame"

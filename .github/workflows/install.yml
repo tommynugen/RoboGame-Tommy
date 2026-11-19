@@ -1,5 +1,5 @@
 # Runs the installers on fresh machines: Ubuntu 22.04, 24.04 and 26.04
-# with ROS, Arch without ROS, ROS in a distrobox (as on Arch), Linux
+# with ROS, Arch with ROS from arch4edu and without ROS, ROS in a distrobox (as on Arch), Linux
 # without ROS, and Windows with and without ROS. Each then starts the app
 # and asks it for /api/app.
 name: install
@@ -19,6 +19,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: install.sh
+        run: bash install.sh --no-menu --no-cloudflared
+      - name: App starts with ROS
+        shell: bash
+        run: |
+          set +u; source /opt/ros/$(cat ~/.config/robogame/ros_distro)/setup.bash; source install/setup.bash
+          timeout 20 ros2 run robogame_sim robogame_gamemaster --no-browser > gm.log 2>&1 &
+          sleep 12; curl -sf http://localhost:8766/api/app | tee app.json
+          grep -q '"console": true' app.json || { cat gm.log; exit 1; }
+
+  arch:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install.sh (ROS 2 from arch4edu)
         run: bash install.sh --no-menu --no-cloudflared
       - name: App starts with ROS
         shell: bash
