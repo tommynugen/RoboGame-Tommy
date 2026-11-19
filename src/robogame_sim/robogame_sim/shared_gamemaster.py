@@ -119,6 +119,14 @@ LINKS
 <script>
 const PAGES = PAGE_DATA;
 const links = [...document.querySelectorAll("nav a[data-tab]")];
+// The wheel scrolls the tab bar sideways in a narrow window.
+const bar = document.querySelector("nav");
+bar.addEventListener("wheel", event => {
+  if (bar.scrollWidth <= bar.clientWidth) return;
+  if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+  bar.scrollLeft += event.deltaY * (event.deltaMode === 1 ? 16 : 1);
+  event.preventDefault();
+}, { passive: false });
 const frames = {};
 for (const link of links) {
   const frame = document.createElement("iframe");
@@ -151,8 +159,10 @@ function show() {
     other.hidden = name !== tab;
   }
   for (const link of links) {
-    if (link.dataset.tab === tab) link.setAttribute("aria-current", "page");
-    else link.removeAttribute("aria-current");
+    if (link.dataset.tab === tab) {
+      link.setAttribute("aria-current", "page");
+      link.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } else link.removeAttribute("aria-current");
   }
   document.title = `${frame.title} · RoboGame Gamemaster (web)`;
   remember("gamemaster-web.tab", tab);
