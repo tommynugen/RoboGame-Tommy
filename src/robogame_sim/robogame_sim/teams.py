@@ -401,7 +401,7 @@ class Teams:
         if self.ruleset == "V2":
             self.say(f"Team {name} {verb}: zones " + ", ".join(
                 f"{m}x" for m in picks["zones"]) +
-                f"; decoy {picks['decoy']}, 2x {picks['double']}")
+                f"; 2x {picks['double']}, decoy {picks['decoy']}")
         else:
             self.say(f"Team {name} {verb}: " + ", ".join(
                 f"{colour} {value}" for colour, value in points.items()))

@@ -110,8 +110,8 @@
         <input id="v2-colours" placeholder="red, green, blue, yellow"></label>
       <div class="row"><button class="primary">Save V2 rules</button></div>
       <p>V2: each team gives zones 1, 2 and 3 a multiplier, shown on the phones
-        in the order typed here, and picks a decoy colour (worth -1 a token) and
-        a 2x colour (worth 2). Other colours are worth 1.</p>
+        in the order typed here, and picks a 2x colour (worth 2) and a decoy colour
+        (worth -1 a token). Other colours are worth 1.</p>
     </form>
     <p id="tokens-note"></p>
   </section>
@@ -187,7 +187,7 @@ function paint(state) {
 
   const head = document.createElement("tr");
   head.append(cell("Team", "th"));
-  const columns = v2 ? ["Zone 1", "Zone 2", "Zone 3", "Decoy", "2x"] : state.tokens;
+  const columns = v2 ? ["Zone 1", "Zone 2", "Zone 3", "2x", "Decoy"] : state.tokens;
   for (const name of columns) {
     const th = cell("", "th");
     th.className = "n";
@@ -208,7 +208,7 @@ function paint(state) {
       for (const m of picks ? picks.zones : [null, null, null]) {
         tr.append(cell(m === null ? "–" : `${m}x`, "n"));
       }
-      for (const colour of picks ? [picks.decoy, picks.double] : [null, null]) {
+      for (const colour of picks ? [picks.double, picks.decoy] : [null, null]) {
         const td = cell("", "n");
         if (colour) td.append(dot(colour), colour); else td.textContent = "–";
         tr.append(td);
