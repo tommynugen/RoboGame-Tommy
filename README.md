@@ -450,20 +450,55 @@ points of the colours that stay. Teams and colours are kept in
 `~/.local/share/robogame_sim/teams.json`, so a restart keeps them, and
 each sign-up or change goes to the Logs tab's Teams source.
 
+### Rulesets and the score calculator
+
+The tab's Ruleset picks how teams score. V1 is the points per token
+colour above. In V2 the phone instead asks the team for a multiplier for
+each of zones 1, 2 and 3, from the Gamemaster's multiplier choices (2x,
+0x and -1x at first; two zones may share one), then a decoy colour,
+worth -1 a token, and a different 2x colour, worth 2, from V2's token
+colours (red, green, blue and yellow at first). Every other colour is
+worth 1. Under Rules, Multiplier choices and Token colours set these;
+the phones show the multipliers in the order typed, so "-1x, 0x, 2x"
+puts -1x first. A team keeps its V1 points and its V2 picks when the
+ruleset changes; picks whose colour is taken away are cleared.
+
+The Score calculator has a box for each zone and token colour: type how
+many tokens of each colour sit in each zone (0 to 99) and every team's
+score shows in the Teams list as you type, worked out as
+
+    score = sum over zones and colours of tokens x token worth x zone multiplier
+
+Say 2 red tokens are in zone 1 and 1 blue in zone 2. A team with red as
+its 2x token, blue as its decoy, zone 1 at 2x and zone 2 at -1x scores
+2 x 2 x 2 + 1 x -1 x -1 = 9. A team with red as its decoy, green as its
+2x token, zone 1 at 0x and zone 2 at 2x scores 2 x -1 x 0 + 1 x 1 x 2 = 2.
+Under V1 the score is each colour's tokens, all zones together, times the
+team's points for it. Clear tokens empties the boxes; the counts are kept
+in `teams.json` with the rest.
+
 With ROS sourced, the teams go out on `/game/teams` (std_msgs/String,
 JSON, latched, so a node started later gets them at once):
 
 ```
-{"tokens": ["red", "blue", "yellow"],
+{"tokens": ["red", "blue", "yellow"], "ruleset": "V2",
+ "colours": ["red", "green", "blue", "yellow"], "zones": ["1", "2", "3"],
+ "multipliers": [2, 0, -1], "counts": {"1": {"red": 2}, "2": {"blue": 1}},
  "teams": [{"name": "Bolt", "points": {"red": 5, "blue": 3, "yellow": 1},
-            "updated": 1793979630.5}]}
+            "picks": {"zones": [2, -1, 0], "decoy": "blue", "double": "red"},
+            "score": 9, "updated": 1793979630.5}]}
 ```
 
-Only the sign-up page and `/api/signup` (GET for the colours and a
-team, POST `{"id", "name", "points"}`) are open to the network; the
+`score` is null for a team with no V2 picks under V2.
+
+Only the sign-up page and `/api/signup` (GET for the ruleset, colours,
+multipliers and a team, POST `{"id", "name", "points"}` under V1 or
+`{"id", "name", "picks"}` under V2) are open to the network; the
 Gamemaster itself still answers only this computer. The Teams tab uses
 GET `/api/teams`, GET `/api/teams/qr.svg` and POST
-`/api/teams/tokens`, `/api/teams/remove` and `/api/teams/clear`. The QR
+`/api/teams/tokens`, `/api/teams/rules` (`{"ruleset", "multipliers",
+"colours"}`), `/api/teams/counts` (`{"counts": {zone: {colour:
+count}}}`), `/api/teams/remove` and `/api/teams/clear`. The QR
 code is made by `qr.py`, so nothing more needs installing.
 
 Checked 2026-11-06: tests (`test_teams.py`: the QR code matches the
@@ -472,6 +507,11 @@ sign-up over HTTP showing on the tab), opencv decoding the QR codes, and
 both pages in Chromium (Playwright) without ROS, the sign-up page at
 phone size. The `/game/teams` topic is not yet run with ROS, nor the
 page on a real phone.
+
+Checked 2026-11-19, rulesets: tests (`test_teams.py`: V2 sign-up rules,
+both worked examples above scoring 9 and 2, V1 scoring, saving), and in
+headless Chromium without ROS a phone-size V2 sign-up showed on the tab,
+where typing the tokens into the calculator gave 9.
 
 ## The app's Vision tab
 

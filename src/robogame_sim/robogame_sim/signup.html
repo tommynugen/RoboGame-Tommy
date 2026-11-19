@@ -40,6 +40,18 @@
   input:focus { outline: 2px solid var(--accent); border-color: transparent; }
   fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; }
   legend { font-weight: 600; margin-bottom: 8px; }
+  [hidden] { display: none !important; }
+  #v2 { display: grid; gap: 18px; }
+  .zone { display: grid; gap: 6px; }
+  .zone span { font-weight: 600; }
+  .pick .dot { flex: none; width: 14px; height: 14px; border-radius: 50%; }
+  .pick { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pick label {
+    display: flex; align-items: center; gap: 6px; padding: 10px 14px;
+    border: 1px solid var(--line); border-radius: 10px; font-size: 17px;
+    text-transform: capitalize; min-height: 48px;
+  }
+  .pick label:has(input:checked) { border-color: var(--accent); outline: 2px solid var(--accent); }
   .token {
     display: grid; grid-template-columns: 28px 1fr 44px 64px 44px;
     align-items: center; gap: 8px;
@@ -70,12 +82,17 @@
 <body>
 <main>
   <h1>RoboGame sign-up</h1>
-  <p>Name your team and say how many points each token colour is worth.</p>
+  <p id="intro">Name your team and say how many points each token colour is worth.</p>
   <form id="form" autocomplete="off">
     <label class="name">Team name
       <input id="name" required maxlength="24" placeholder="e.g. Bolt">
     </label>
     <fieldset id="tokens"><legend>Points per token</legend></fieldset>
+    <div id="v2" hidden>
+      <fieldset id="zones"><legend>Zone multipliers</legend></fieldset>
+      <fieldset id="decoy"><legend>Decoy token (worth -1)</legend></fieldset>
+      <fieldset id="double"><legend>2x token (worth 2)</legend></fieldset>
+    </div>
     <button class="send" id="send" type="submit">Sign up</button>
     <p id="note" role="status"></p>
   </form>
@@ -95,6 +112,7 @@ const remember = (value) => {
 const $ = (id) => document.getElementById(id);
 let teamId = remember();
 let maxPoints = 100;
+let ruleset = "V1";
 
 function note(text, look) {
   $("note").textContent = text;
@@ -128,6 +146,36 @@ function row(colour, value) {
   return line;
 }
 
+// A row of radio buttons, one per choice, in the given order.
+function choices(set, name, options, picked, label) {
+  set.querySelectorAll(".pick").forEach((line) => line.remove());
+  const line = document.createElement("div");
+  line.className = "pick";
+  for (const option of options) {
+    const box = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "radio"; input.name = name; input.value = option;
+    input.checked = String(option) === String(picked);
+    box.append(input);
+    if (label === "colour") box.append(dotFor(option));
+    box.append(label === "colour" ? option : `${option}x`);
+    line.append(box);
+  }
+  set.append(line);
+}
+
+function dotFor(colour) {
+  const dot = document.createElement("i");
+  dot.className = "dot";
+  dot.style.background = colour;
+  return dot;
+}
+
+const picked = (name) => {
+  const input = document.querySelector(`input[name="${name}"]:checked`);
+  return input ? input.value : null;
+};
+
 async function load() {
   const query = teamId ? `?id=${encodeURIComponent(teamId)}` : "";
   const reply = await fetch(`/api/signup${query}`);
@@ -135,11 +183,33 @@ async function load() {
   maxPoints = data.max_points;
   const team = data.team;
   if (teamId && !team) { teamId = null; remember(null); }
+  ruleset = data.ruleset || "V1";
+  const v2 = ruleset === "V2";
+  $("tokens").hidden = v2;
+  $("v2").hidden = !v2;
+  $("intro").textContent = v2
+    ? "Name your team, give each zone a multiplier and pick your decoy and 2x tokens."
+    : "Name your team and say how many points each token colour is worth.";
   const set = $("tokens");
   set.querySelectorAll(".token").forEach((line) => line.remove());
   for (const colour of data.tokens) {
-    set.append(row(colour, team ? team.points[colour] ?? 0 : 0));
+    set.append(row(colour, team ? (team.points || {})[colour] ?? 0 : 0));
   }
+  const picks = (team && team.picks) || null;
+  const zones = $("zones");
+  zones.querySelectorAll(".zone").forEach((line) => line.remove());
+  data.zones.forEach((zone, index) => {
+    const box = document.createElement("div");
+    box.className = "zone";
+    const title = document.createElement("span");
+    title.textContent = `Zone ${zone}`;
+    box.append(title);
+    zones.append(box);
+    choices(box, `zone${zone}`, data.multipliers,
+            picks ? picks.zones[index] : null, "x");
+  });
+  choices($("decoy"), "decoy", data.colours, picks ? picks.decoy : null, "colour");
+  choices($("double"), "double", data.colours, picks ? picks.double : null, "colour");
   if (team) {
     $("name").value = team.name;
     $("send").textContent = "Save changes";
@@ -156,12 +226,17 @@ $("form").addEventListener("submit", async (event) => {
   for (const input of document.querySelectorAll("#tokens input")) {
     points[input.dataset.colour] = parseInt(input.value, 10) || 0;
   }
+  const zoneNames = [...document.querySelectorAll("#zones .zone")]
+    .map((box) => box.querySelector("input").name);
+  const picks = { zones: zoneNames.map(picked), decoy: picked("decoy"),
+                  double: picked("double") };
   $("send").disabled = true;
   note("Sending…");
   try {
     const reply = await fetch("/api/signup", {
       method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({id: teamId, name: $("name").value, points}),
+      body: JSON.stringify({id: teamId, name: $("name").value,
+                            ...(ruleset === "V2" ? {picks} : {points})}),
     });
     const data = await reply.json();
     if (!reply.ok) throw new Error(data.error || "that did not go through");
