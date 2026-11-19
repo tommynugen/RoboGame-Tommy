@@ -81,7 +81,19 @@ and real robots, but no Gazebo. On Ubuntu it adds the ROS apt source if there is
 none, installs `ros-DISTRO-ros-base`, `ros-gz` (24.04 and up), `joy`,
 `ros-dev-tools`, OpenCV, pywebview and `cloudflared`, clones the repo to
 `~/Robogame-Tommy` (or uses the checkout it is in), builds it, and
-runs `scripts/desktop/install.sh`. Options: `--ros DISTRO`, `--no-ros`
+runs `scripts/desktop/install.sh`.
+
+Before Gazebo it asks "Install Gazebo to simulate the RoboGame?", says
+what Gazebo is for (launching arenas from the editor, simulated robots,
+trying the chase without the real arena) and how much disk it needs. On
+Ubuntu the sizes come from apt; on 26.04 ROS 2 takes about 0.8 GB and
+Gazebo about 2 GB more. On Arch, yes means the distrobox (about 6 GB in
+all) and no means arch4edu (about 1.9 GB, no Gazebo). `--sim` or
+`--no-sim` answers it ahead, and with no terminal to ask (as in CI)
+it says yes. Run it again with `--sim` to add
+Gazebo later.
+
+Options: `--ros DISTRO`, `--sim`, `--no-sim`, `--no-ros`
 (a `.venv` with pip instead of ROS), `--dir PATH`, `--no-cloudflared`,
 `--no-menu`. The app menu entry finds whichever ROS is installed, or runs
 without ROS from the `.venv`.
@@ -113,7 +125,9 @@ With nothing installed at all, the one-file web version
 The `install` GitHub workflow runs both installers on fresh Ubuntu 22.04,
 24.04 and 26.04, Linux without ROS, and Windows, and starts the app on
 each. (Checked 2026-11-19: all of these in the workflow, the app answering
-`/api/app` on each, with the robot console on wherever ROS is.)
+`/api/app` on each, with the robot console on wherever ROS is.) (Checked 2026-11-19 in the same workflow: apt sizes on 26.04, ROS 2
+Lyrical 818 MB and Gazebo 1952 MB more; arch4edu's three pacman steps
+157, 225 and 1481 MiB. The Arch distrobox size is an estimate.)
 
 ## Setup by hand
 
