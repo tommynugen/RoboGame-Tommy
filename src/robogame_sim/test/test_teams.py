@@ -141,6 +141,7 @@ def test_v2_zone_ruleset_scores(tmp_path):
     for bad in ({"zones": [2, 2], "decoy": "red", "double": "blue"},
                 {"zones": [3, 0, 0], "decoy": "red", "double": "blue"},
                 {"zones": [2, 0, -1], "decoy": "red", "double": "red"},
+                {"zones": [2, 2, -1], "decoy": "red", "double": "blue"},
                 {"zones": [2, 0, -1], "decoy": "pink", "double": "red"}):
         with pytest.raises(ValueError):
             store.sign_up({"name": "Bad", "picks": bad})
@@ -153,8 +154,9 @@ def test_v2_zone_ruleset_scores(tmp_path):
     assert json.loads(published[-1])["teams"][1]["score"] == 9
     with pytest.raises(ValueError):
         store.set_counts({"1": {"red": -1}})
-    with pytest.raises(ValueError):
-        store.set_rules({"multipliers": "lots"})
+    for bad in ("lots", "2x, 0x", "2, 2, 0"):
+        with pytest.raises(ValueError):
+            store.set_rules({"multipliers": bad})
     # V1 still scores by points per colour; V2 picks are kept.
     store.set_rules({"ruleset": "V1"})
     assert store.state()["teams"][0]["score"] == 10

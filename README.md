@@ -465,7 +465,8 @@ each sign-up or change goes to the Logs tab's Teams source.
 The tab's Ruleset picks how teams score. V1 is the points per token
 colour above. In V2 the phone instead asks the team for a multiplier for
 each of zones 1, 2 and 3, from the Gamemaster's multiplier choices (2x,
-0x and -1x at first; two zones may share one), then a decoy colour,
+0x and -1x at first; each zone a different one, so at least three
+choices), then a decoy colour,
 worth -1 a token, and a different 2x colour, worth 2, from V2's token
 colours (red, green, blue and yellow at first). Every other colour is
 worth 1. Under Rules, Multiplier choices and Token colours set these;
@@ -522,6 +523,11 @@ Checked 2026-11-19, rulesets: tests (`test_teams.py`: V2 sign-up rules,
 both worked examples above scoring 9 and 2, V1 scoring, saving), and in
 headless Chromium without ROS a phone-size V2 sign-up showed on the tab,
 where typing the tokens into the calculator gave 9.
+
+Checked 2026-11-19, no repeats: tests (`test_teams.py` refuses a
+multiplier used twice and the same colour for decoy and 2x), and in
+headless Chromium the phone page greys out a multiplier another zone
+has and the colour the other token has.
 
 ## The app's Vision tab
 
