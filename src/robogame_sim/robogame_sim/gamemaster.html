@@ -37,13 +37,19 @@
     background: var(--bg); color: var(--ink);
     font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
   }
+  /* One row that scrolls sideways (wheel, touch or drag on the bar) when
+     the window is too narrow for every tab. */
   nav {
-    display: flex; align-items: stretch; gap: 4px; flex-wrap: wrap;
+    display: flex; align-items: stretch; gap: 4px; flex-wrap: nowrap;
+    flex-shrink: 0; overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: thin; overscroll-behavior-x: contain;
     padding: 0 12px; background: var(--panel);
     border-bottom: 1px solid var(--line);
   }
-  nav strong { align-self: center; margin-right: 12px; }
+  nav > * { flex-shrink: 0; }
+  nav strong { align-self: center; margin-right: 12px; white-space: nowrap; }
   nav a {
+    white-space: nowrap;
     display: flex; align-items: center; gap: 6px;
     padding: 8px 12px; color: var(--muted); text-decoration: none;
     border-bottom: 2px solid transparent;
@@ -60,8 +66,8 @@
   .badge[hidden] { display: none; }
   /* At a glance: ROS, the sim, robots and the arena, right of the tabs. */
   #status {
-    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-    margin-left: auto; padding: 4px 0;
+    display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;
+    margin-left: auto; padding: 4px 0 4px 12px;
   }
   .chip {
     display: flex; align-items: center; gap: 6px;
@@ -153,6 +159,16 @@
 <script src="dialogs.js"></script>
 <script>
 const links = [...document.querySelectorAll("nav a[data-tab]")];
+// A mouse wheel turned over the tab bar scrolls it sideways, so the tabs
+// past the window's edge can be reached; touch and trackpads scroll it
+// as they are.
+const bar = document.querySelector("nav");
+bar.addEventListener("wheel", (event) => {
+  if (bar.scrollWidth <= bar.clientWidth) return;
+  if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+  bar.scrollLeft += event.deltaY * (event.deltaMode === 1 ? 16 : 1);
+  event.preventDefault();
+}, { passive: false });
 const frames = {};
 const TITLES = {};
 for (const link of links) {
@@ -208,8 +224,11 @@ function show() {
     other.hidden = name !== tab;
   }
   for (const link of links) {
-    if (link.dataset.tab === tab) link.setAttribute("aria-current", "page");
-    else link.removeAttribute("aria-current");
+    if (link.dataset.tab === tab) {
+      link.setAttribute("aria-current", "page");
+      // Alt+8 and the chips can show a tab scrolled out of the bar.
+      link.scrollIntoView({ block: "nearest", inline: "nearest" });
+    } else link.removeAttribute("aria-current");
   }
   document.title = `${TITLES[tab]} · RoboGame Gamemaster`;
   current = tab;

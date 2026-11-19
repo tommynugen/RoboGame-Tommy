@@ -314,6 +314,16 @@ says whether it sees the four corner tags; it opens the Vision tab. Each
 tab's page title is its tab's name.
 GET `/api/app` gives what the bar shows.
 
+In a window too narrow for every tab, the bar stays one row and scrolls
+sideways: turn the mouse wheel over it, swipe it on a touch screen or
+trackpad, or use its thin scroll bar. The tab shown (by a click, a chip
+or Alt+N) is scrolled into view. The web version's bar does the same.
+
+Checked 2026-11-19: tests, and in headless Chromium at 700 px wide the
+bar stayed 38 px high, opening `#teams` scrolled Teams into view, and in
+the web version a wheel turn over the bar scrolled it 600 px, bringing
+Teams on screen, with no page errors.
+
 Quit, at the top right, stops the Gamemaster after an OK: the same as
 Ctrl-C in its terminal, so the sim, BLE bridge, controller robots,
 camera, arena_perception nodes and Upkeep or Chase jobs it started stop
