@@ -248,8 +248,12 @@ elif [ "$no_ros" = 0 ]; then
         && ! grep -rqs packages.ros.org /etc/apt/sources.list.d/; then
         pkg_install software-properties-common
         need_sudo add-apt-repository -y universe
-        tag="$(curl -fsSL https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest \
-               | grep -F '"tag_name"' | cut -d'"' -f4)"
+        # The newest release's tag, from where GitHub's "latest" link goes.
+        # (Not GitHub's API: it allows only 60 calls an hour per address,
+        # which shared networks and CI machines run out of.)
+        tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+               https://github.com/ros-infrastructure/ros-apt-source/releases/latest)"
+        tag="${tag##*/}"
         [ -n "$tag" ] || die "Could not look up the ROS apt source on GitHub."
         curl -fsSL -o /tmp/ros2-apt-source.deb \
             "https://github.com/ros-infrastructure/ros-apt-source/releases/download/$tag/ros2-apt-source_$tag.${codename}_all.deb"

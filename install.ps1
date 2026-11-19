@@ -96,7 +96,11 @@ if ($WithRos) {
         $env:PATH = "$pixiBin;$env:PATH"
     }
     if (-not (Test-Path (Join-Path $Ros "local_setup.bat"))) {
-        $releases = Invoke-RestMethod "https://api.github.com/repos/ros2/ros2/releases?per_page=50"
+        # GitHub's API allows 60 calls an hour per address without a token;
+        # a GITHUB_TOKEN, as CI has, lifts that.
+        $headers = @{}
+        if ($env:GITHUB_TOKEN) { $headers["Authorization"] = "Bearer $env:GITHUB_TOKEN" }
+        $releases = Invoke-RestMethod -Headers $headers "https://api.github.com/repos/ros2/ros2/releases?per_page=50"
         $asset = $releases | Where-Object { $_.tag_name -like "release-lyrical-*" } |
             ForEach-Object { $_.assets } |
             Where-Object { $_.name -like "*windows*amd64*.zip" -and $_.name -notlike "*debug*" } |

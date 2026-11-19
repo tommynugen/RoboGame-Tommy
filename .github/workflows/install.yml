@@ -106,6 +106,7 @@ jobs:
     env:
       ROBOGAME_REPO: ${{ github.repository }}
       ROBOGAME_REF: ${{ github.head_ref || github.ref_name }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: install.ps1
         shell: pwsh
