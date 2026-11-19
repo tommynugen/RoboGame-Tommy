@@ -3,7 +3,7 @@
 # this Ubuntu, the app's other parts, this repo, the build, and an entry
 # in the app menu. Run it again to update. From a fresh machine:
 #
-#   curl -fsSL https://raw.githubusercontent.com/tommynugen/RoboGames-Fall-2026/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/tommynugen/Robogame-Tommy/main/install.sh | bash
 #
 # or from a checkout: ./install.sh. It asks for your password once (sudo).
 #
@@ -15,12 +15,12 @@
 #   --ros DISTRO       pick the ROS 2 distro yourself (lyrical, kilted, jazzy, humble)
 #   --no-ros           no ROS at all: the app in a Python venv, for any Linux
 #                      (editor, vision, teams and chase tabs; no robot console)
-#   --dir PATH         where to put the repo (default ~/RoboGames-Fall-2026)
+#   --dir PATH         where to put the repo (default ~/Robogame-Tommy)
 #   --no-cloudflared   skip cloudflared (the Teams tab's public sign-up link)
 #   --no-menu          skip the app menu entry
 set -euo pipefail
 
-REPO_URL="https://github.com/tommynugen/RoboGames-Fall-2026.git"
+REPO_URL="https://github.com/tommynugen/Robogame-Tommy.git"
 dir=""
 distro=""
 no_ros=0
@@ -124,7 +124,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
 if [ -z "$dir" ] && [ -n "$here" ] && [ -d "$here/src/robogame_sim" ]; then
     dir="$here"
 fi
-dir="${dir:-$HOME/RoboGames-Fall-2026}"
+dir="${dir:-$HOME/Robogame-Tommy}"
 if [ -d "$dir/.git" ]; then
     git -C "$dir" pull --ff-only || warn "Could not update $dir (local changes?); building it as it is."
 elif [ -d "$dir/src/robogame_sim" ]; then
