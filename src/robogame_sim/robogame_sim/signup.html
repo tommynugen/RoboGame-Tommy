@@ -90,8 +90,8 @@
     <fieldset id="tokens"><legend>Points per token</legend></fieldset>
     <div id="v2" hidden>
       <fieldset id="zones"><legend>Zone multipliers</legend></fieldset>
-      <fieldset id="decoy"><legend>Decoy token (worth -1)</legend></fieldset>
       <fieldset id="double"><legend>2x token (worth 2)</legend></fieldset>
+      <fieldset id="decoy"><legend>Decoy token (worth -1)</legend></fieldset>
     </div>
     <button class="send" id="send" type="submit">Sign up</button>
     <p id="note" role="status"></p>
@@ -218,7 +218,7 @@ async function load() {
   $("tokens").hidden = v2;
   $("v2").hidden = !v2;
   $("intro").textContent = v2
-    ? "Name your team, give each zone a multiplier and pick your decoy and 2x tokens."
+    ? "Name your team, give each zone a multiplier and pick your 2x and decoy tokens."
     : "Name your team and say how many points each token colour is worth.";
   const set = $("tokens");
   set.querySelectorAll(".token").forEach((line) => line.remove());
