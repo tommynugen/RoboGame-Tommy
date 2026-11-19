@@ -351,14 +351,15 @@ stopped in red when a run ended on its own with an error code), the
 BLE bridge's once it is started (searching, found or lost), how many
 robots the console sees, the arena in use, and Chase N/M while chase
 tests run from the Chase tab. Click one to open the tab
-that deals with it: the sim's opens the Arena editor and its Launch
-buttons, or Logs after a failed run. The Logs tab shows in red how many
+that deals with it: the sim's opens the Gazebo tab while a sim runs,
+the Arena editor and its Launch buttons when none does, or Logs after a
+failed run. The Logs tab shows in red how many
 errors came since it was last looked at, and a new error pops up in the
 bottom corner for 15 s while another tab shows, with Show to open Logs.
 If the app stops answering, a red bar says how to start it again, and
-the page reconnects by itself. Alt+1 to Alt+8 switch tabs, in the
+the page reconnects by itself. Alt+1 to Alt+9 switch tabs, in the
 order Setup, Arena editor, Robot console, Vision, Chase, Logs, Upkeep,
-Teams, and opening http://localhost:8766 with no tab named opens the one shown
+Teams, Gazebo, and opening http://localhost:8766 with no tab named opens the one shown
 last (Setup the first time). Once the arena camera is on, a Camera chip
 says whether it sees the four corner tags; it opens the Vision tab. Each
 tab's page title is its tab's name.
@@ -492,7 +493,7 @@ against Onshape or a real build.
 
 ## The app's Teams tab
 
-The Teams tab, last of the Gamemaster's tabs, signs teams up from their
+The Teams tab signs teams up from their
 phones. It shows a QR code for the sign-up page, at this computer's
 address on its network, port 8767 (`--signup-port` to change it). A
 phone on the same Wi-Fi (or any network, with the Public link below)
@@ -631,6 +632,50 @@ Wi-Fi address needs none, and stopping the link turns its code away; a
 missing `cloudflared` is reported), and the tab and the sign-up page in
 headless Chromium without ROS. Not yet run with the real `cloudflared`
 or a phone on mobile data.
+
+## The app's Gazebo tab
+
+The Gazebo tab, last of the Gamemaster's tabs, shows the running Gazebo
+world in the app, so no Gazebo window is needed. It asks Gazebo over
+gz-transport for the world's scene (each model, link and visual with its
+shape, colour and mesh) and draws it with three.js, then moves each part
+as Gazebo sends out its poses (up to 60 times a second). Drag to turn the
+view, right-drag to move it, wheel to zoom; Top view and Angled view
+frame the arena, and Follow keeps a robot in the middle. A robot spawned
+later shows up within a second.
+
+The bar over the view gives the world's name, whether it runs or is
+paused, its sim time and how fast it runs against real time, with:
+
+- Play and Pause, and Step for one physics step while paused.
+- Reset, which puts each robot and token back where the tab first saw
+  it. It is not Gazebo's own reset: that goes back to the world file,
+  which takes away the robots spawned after the world started.
+- An arena list with Start sim and Stop sim: Start launches
+  `sim.launch.py` on that layout with `gui:=false fpv:=false`, so it
+  runs with no Gazebo window and shows here. A sim started from the
+  Arena editor shows here too.
+
+Gazebo still has to be installed. When it is not, the tab says so and
+how to get it (the installer's Install Gazebo, or
+`sudo apt install ros-lyrical-ros-gz`). When Gazebo is there but its
+Python bindings are not (the app was started without ROS sourced), it
+says that instead. With no world running it says how to start one.
+
+Routes, in `sim_view.py`: GET `/api/gazebo` (installed, connected,
+world, paused, sim time, real time factor, scene number, the sim's
+state), GET `/api/gazebo/scene`, GET `/api/gazebo/poses`, GET
+`/api/gazebo/mesh?uri=URI` (.stl, .dae and .obj files the scene names,
+nothing else) and POST `/api/gazebo/control {"action": "play" | "pause"
+| "step" | "reset"}`.
+
+Checked 2026-11-19: tests, and against `gz sim -s` (Gazebo Jetty 10.6,
+headless) on the default layout with robot_1 spawned over gz-transport.
+The tab drew the arena's 189 STL modules, the walls, tokens and the
+robot in headless Chromium; a pose set in Gazebo showed in
+`/api/gazebo/poses` within 1 s; Pause, Step and Play changed the
+world's paused state; Reset put robot_1 back at its spawn spot and kept
+it in the world; and with no Gazebo the tab showed the install message.
 
 ## The app's Vision tab
 

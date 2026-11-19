@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gazebo</title>
+<style>
+  /* The colours of the other tabs. */
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --ink: #1d2433; --muted: #5d6677;
+    --line: #d9dde4; --accent: #2f5fb4; --accent-ink: #ffffff;
+    --good: #2e8b57; --warn: #a86a00; --bad: #d23c3c; --sky: #dfe6ee;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14171d; --panel: #1c2028; --ink: #e6e9ef; --muted: #9aa3b2;
+      --line: #2e3440; --accent: #6d97e6; --accent-ink: #0d1117;
+      --good: #5cc28a; --warn: #e0a640; --bad: #f06b6b; --sky: #20252e;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171d; --panel: #1c2028; --ink: #e6e9ef; --muted: #9aa3b2;
+    --line: #2e3440; --accent: #6d97e6; --accent-ink: #0d1117;
+    --good: #5cc28a; --warn: #e0a640; --bad: #f06b6b; --sky: #20252e;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column;
+  }
+  button, select {
+    font: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary {
+    background: var(--accent); color: var(--accent-ink);
+    border-color: var(--accent); font-weight: 600;
+  }
+  header {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 10px 16px; background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  header .sep { width: 1px; height: 24px; background: var(--line); }
+  #state { font-weight: 600; }
+  #state.good { color: var(--good); }
+  #state.warn { color: var(--warn); }
+  #state.bad { color: var(--bad); }
+  #clock { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .grow { flex: 1; }
+  #view { position: relative; flex: 1; min-height: 0; background: var(--sky); }
+  #view canvas { display: block; width: 100%; height: 100%; }
+  #hint {
+    position: absolute; left: 12px; bottom: 10px; color: var(--muted);
+    font-size: 12px; pointer-events: none;
+  }
+  #message {
+    position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; padding: 20px; background: var(--bg);
+  }
+  #message[hidden] { display: none; }
+  #message div {
+    max-width: 560px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 20px 24px;
+  }
+  #message h2 { margin: 0 0 8px; font-size: 18px; }
+  #message code {
+    background: var(--bg); padding: 2px 6px; border-radius: 4px;
+    overflow-wrap: anywhere;
+  }
+  #message .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  #error { color: var(--bad); }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<header>
+  <span id="state">Looking for Gazebo…</span>
+  <span id="clock"></span>
+  <span class="sep"></span>
+  <button id="play" title="Run the world">▶ Play</button>
+  <button id="pause" title="Pause the world">❚❚ Pause</button>
+  <button id="step" title="One physics step, paused">Step</button>
+  <button id="reset" title="Put each robot and token back where this tab first saw it">Reset</button>
+  <span class="sep"></span>
+  <label>Follow <select id="follow"><option value="">Nothing</option></select></label>
+  <button id="top">Top view</button>
+  <button id="angle">Angled view</button>
+  <span class="grow"></span>
+  <span id="error" role="status"></span>
+  <select id="layout" title="The arena to launch"></select>
+  <button id="start" class="primary">Start sim</button>
+  <button id="stop">Stop sim</button>
+</header>
+<div id="view">
+  <span id="hint">Left-drag to turn, right-drag to move, wheel to zoom.</span>
+  <div id="message" hidden><div id="message-box"></div></div>
+</div>
+<script src="dialogs.js"></script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
+import { ColladaLoader } from "three/addons/loaders/ColladaLoader.js";
+import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+
+const $ = id => document.getElementById(id);
+const api = async (path, body) => {
+  const response = await fetch(path, body === undefined ? {} : {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || response.statusText);
+  return data;
+};
+
+// -- the 3D view: +z up, as in Gazebo ------------------------------------
+
+const view = $("view");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+view.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 1.3));
+const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+sun.position.set(-0.6, -0.4, 1.2);
+scene.add(sun);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 200);
+camera.up.set(0, 0, 1);
+camera.position.set(0, -1.6, 1.3);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+function sky() {
+  const colour = getComputedStyle(document.documentElement)
+    .getPropertyValue("--sky").trim();
+  scene.background = new THREE.Color(colour || "#dfe6ee");
+}
+sky();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", sky);
+
+function resize() {
+  const { clientWidth: w, clientHeight: h } = view;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / Math.max(h, 1);
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(view);
+
+// -- the world's scene, from GET /api/gazebo/scene -----------------------
+
+const world = new THREE.Group();
+scene.add(world);
+const parts = new Map();  // Gazebo entity id: its Group
+const meshes = new Map();  // mesh url: Promise of an Object3D
+const stl = new STLLoader(), dae = new ColladaLoader(), obj = new OBJLoader();
+let version = -1;
+
+function place(object, pose) {
+  object.position.set(pose[0], pose[1], pose[2]);
+  object.quaternion.set(pose[3], pose[4], pose[5], pose[6]);
+}
+
+function loadMesh(url) {
+  if (!meshes.has(url)) {
+    const uri = decodeURIComponent(url.split("uri=")[1] || "").toLowerCase();
+    meshes.set(url, new Promise((done, fail) => {
+      if (uri.endsWith(".stl")) {
+        stl.load(url, g => done(new THREE.Mesh(g)), undefined, fail);
+      } else if (uri.endsWith(".dae")) {
+        dae.load(url, d => done(d.scene), undefined, fail);
+      } else if (uri.endsWith(".obj")) {
+        obj.load(url, done, undefined, fail);
+      } else fail(new Error(`no loader for ${uri}`));
+    }));
+  }
+  return meshes.get(url);
+}
+
+function shape(s, material) {
+  let geometry;
+  switch (s.type) {
+    case "box": geometry = new THREE.BoxGeometry(...s.size); break;
+    case "sphere": geometry = new THREE.SphereGeometry(s.radius, 24, 16); break;
+    case "plane": geometry = new THREE.PlaneGeometry(...s.size); break;
+    case "cylinder":
+    case "capsule": {
+      geometry = s.type === "cylinder"
+        ? new THREE.CylinderGeometry(s.radius, s.radius, s.length, 32)
+        : new THREE.CapsuleGeometry(s.radius, s.length, 6, 16);
+      geometry.rotateX(Math.PI / 2);  // three's are along y, Gazebo's z
+      break;
+    }
+    case "mesh": {
+      const holder = new THREE.Group();
+      holder.scale.set(...s.scale);
+      loadMesh(s.url).then(model => {
+        const copy = model.clone();
+        // An STL has no colour of its own: the visual's colour.
+        copy.traverse(o => { if (o.isMesh && !o.material.map) o.material = material; });
+        holder.add(copy);
+      }).catch(error => console.warn("mesh", s.url, error));
+      return holder;
+    }
+    default: return null;
+  }
+  return new THREE.Mesh(geometry, material);
+}
+
+function build(data) {
+  world.clear();
+  parts.clear();
+  const follow = $("follow"), followed = follow.value;
+  follow.length = 1;
+  for (const node of data.nodes) {
+    const group = new THREE.Group();
+    group.name = node.name;
+    place(group, node.pose);
+    for (const visual of node.visuals) {
+      const [r, g, b, a] = visual.color;
+      const material = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(r, g, b), transparent: a < 1, opacity: a,
+        side: visual.shape.type === "plane" ? THREE.DoubleSide : THREE.FrontSide });
+      const object = shape(visual.shape, material);
+      if (!object) continue;
+      place(object, visual.pose);
+      group.add(object);
+    }
+    (parts.get(node.parent) || world).add(group);
+    parts.set(node.id, group);
+    if (node.parent === null && /^robot/.test(node.name)) {
+      follow.add(new Option(node.name, node.id));
+    }
+  }
+  follow.value = [...follow.options].some(o => o.value === followed)
+    ? followed : "";
+  version = data.version;
+}
+
+async function loadScene() {
+  try {
+    build(await api("/api/gazebo/scene"));
+  } catch (error) { /* the next status poll tries again */ }
+}
+
+// -- poses, as often as the screen draws ---------------------------------
+
+let asking = false;
+async function poses() {
+  if (asking || !connected) return;
+  asking = true;
+  try {
+    const data = await api("/api/gazebo/poses");
+    for (const [id, pose] of Object.entries(data.poses)) {
+      const part = parts.get(Number(id));
+      if (part) place(part, pose);
+    }
+  } catch (error) { /* gone: the status poll says so */ }
+  asking = false;
+}
+
+const target = new THREE.Vector3();
+function frame() {
+  requestAnimationFrame(frame);
+  poses();
+  const followed = parts.get(Number($("follow").value));
+  if (followed) {
+    followed.getWorldPosition(target);
+    camera.position.add(target.clone().sub(controls.target));
+    controls.target.copy(target);
+  }
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function look(top) {
+  // The arena and robots, not the ground plane round them.
+  const box = new THREE.Box3();
+  world.traverse(o => {
+    if (o.isMesh && o.geometry.type !== "PlaneGeometry") box.expandByObject(o);
+  });
+  const size = box.isEmpty() ? 1.3 : Math.min(
+    Math.max(box.max.x - box.min.x, box.max.y - box.min.y), 6);
+  const middle = box.isEmpty() ? new THREE.Vector3()
+    : box.getCenter(new THREE.Vector3()).setZ(0);
+  controls.target.copy(middle);
+  camera.position.copy(middle).add(top
+    ? new THREE.Vector3(0, -0.001, size * 1.25)
+    : new THREE.Vector3(0, -size * 1.1, size * 0.9));
+}
+$("top").onclick = () => { $("follow").value = ""; look(true); };
+$("angle").onclick = () => { $("follow").value = ""; look(false); };
+
+// -- status and buttons, every second -------------------------------------
+
+let connected = false, looked = false;
+
+function message(html) {
+  $("message").hidden = !html;
+  if (html) $("message-box").innerHTML = html;
+}
+
+const NOT_INSTALLED = `<h2>Gazebo is not installed</h2>
+<p>The Gazebo tab shows the sim right here, but it needs Gazebo Jetty on
+this computer to run it. Run the Gamemaster installer again and say yes
+to <b>Install Gazebo</b>, or install it yourself:</p>
+<p><code>sudo apt install ros-lyrical-ros-gz</code></p>
+<p>Then quit the Gamemaster and open it again.</p>`;
+const NO_BINDINGS = `<h2>Gazebo's Python parts are missing</h2>
+<p>Gazebo is here, but the app talks to it through gz-transport's Python
+bindings, which it cannot find. Start the Gamemaster from a terminal with
+ROS sourced (<code>source /opt/ros/lyrical/setup.bash</code>), or install
+them with <code>sudo apt install python3-gz-transport15</code>, then open
+the Gamemaster again.</p>`;
+const NO_WORLD = `<h2>No sim is running</h2>
+<p>Pick an arena above and press <b>Start sim</b>. It runs with no
+Gazebo window and shows here. A sim started from the Arena editor shows
+here too.</p>`;
+
+async function poll() {
+  let state;
+  try {
+    state = await api("/api/gazebo");
+  } catch (error) {
+    $("state").textContent = "The app is not answering";
+    $("state").className = "bad";
+    return;
+  }
+  const sim = state.sim || {};
+  $("start").disabled = !state.installed || sim.running || state.connected;
+  $("stop").disabled = !sim.running;
+  $("layout").disabled = !!sim.running;
+  connected = state.connected;
+  for (const id of ["play", "pause", "step", "reset"]) {
+    $(id).disabled = !connected;
+  }
+  if (!state.installed) {
+    message(NOT_INSTALLED);
+  } else if (!state.bindings) {
+    message(NO_BINDINGS);
+  } else if (!connected) {
+    message(sim.running
+      ? `<h2>Starting ${sim.layout}…</h2><p>Gazebo is loading the world.
+         It shows here once it is up.</p>` : NO_WORLD);
+  } else message("");
+
+  const label = $("state");
+  if (connected) {
+    label.textContent = `${state.world}: ${state.paused ? "paused" : "running"}`;
+    label.className = state.paused ? "warn" : "good";
+    $("clock").textContent = `${state.sim_time.toFixed(1)} s · ` +
+      `${Math.round(state.rtf * 100)}% real time`;
+    $("play").hidden = !state.paused;
+    $("pause").hidden = state.paused;
+    if (state.scene !== version) {
+      await loadScene();
+      if (!looked && world.children.length) {
+        looked = true;
+        await Promise.allSettled([...meshes.values()]);
+        look(false);
+      }
+    }
+  } else {
+    label.textContent = state.installed ? "No world" : "No Gazebo";
+    label.className = "";
+    $("clock").textContent = "";
+    $("play").hidden = false;
+    $("pause").hidden = true;
+    if (version !== -1) { world.clear(); parts.clear(); version = -1; looked = false; }
+  }
+}
+
+async function act(action) {
+  $("error").textContent = "";
+  try { await api("/api/gazebo/control", { action }); }
+  catch (error) { $("error").textContent = error.message; }
+  poll();
+}
+for (const id of ["play", "pause", "step", "reset"]) {
+  $(id).onclick = () => act(id);
+}
+
+async function layouts() {
+  try {
+    const [{ layouts }, sim] = await Promise.all(
+      [api("/api/layouts"), api("/api/sim")]);
+    const pick = $("layout");
+    pick.replaceChildren(...layouts.map(name => new Option(name, name)));
+    if (sim.layout && layouts.includes(sim.layout)) pick.value = sim.layout;
+  } catch (error) { /* the editor's routes are always there */ }
+}
+
+$("start").onclick = async () => {
+  $("error").textContent = "";
+  try {
+    await api("/api/sim", { layout: $("layout").value,
+      options: { gui: false, fpv: false } });
+  } catch (error) { $("error").textContent = error.message; }
+  poll();
+};
+$("stop").onclick = async () => {
+  if (!await askYes("Stop the sim? Its robots go away.")) return;
+  try { await api("/api/sim/stop", {}); }
+  catch (error) { $("error").textContent = error.message; }
+  poll();
+};
+
+layouts();
+poll();
+setInterval(poll, 1000);
+resize();
+frame();
+</script>
+</body>
+</html>
