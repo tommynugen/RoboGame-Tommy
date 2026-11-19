@@ -31,7 +31,7 @@
     margin: 0; background: var(--bg); color: var(--ink);
     font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
   }
-  button, input {
+  button, input, select {
     font: inherit; color: var(--ink); background: var(--bg);
     border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px;
   }
@@ -68,6 +68,11 @@
          margin-right: 5px; border: 1px solid var(--line); vertical-align: -1px; }
   td button { padding: 2px 8px; }
   .wide { overflow-x: auto; }
+  .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  label.inline { display: flex; gap: 8px; align-items: center; }
+  #calc input { width: 64px; text-align: right; }
+  td.score { font-weight: 700; }
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
@@ -80,13 +85,46 @@
     <p>Phones must be on the same Wi-Fi as this computer. A team can scan
       again to change its name or points.</p>
   </section>
+  <div class="side">
   <section>
-    <h2>Token colours</h2>
-    <form class="row" id="tokens-form">
-      <input id="tokens" aria-label="Token colours" placeholder="red, blue, yellow">
-      <button class="primary">Set colours</button>
+    <div class="row" style="justify-content: space-between">
+      <h2>Rules</h2>
+      <label class="inline">Ruleset
+        <select id="ruleset" aria-label="Ruleset">
+          <option value="V1">V1: points per token</option>
+          <option value="V2">V2: zone multipliers</option>
+        </select></label>
+    </div>
+    <div id="v1-rules">
+      <form class="row" id="tokens-form">
+        <input id="tokens" aria-label="Token colours" placeholder="red, blue, yellow">
+        <button class="primary">Set colours</button>
+      </form>
+      <p>V1: each team says how many points each token colour is worth to it.
+        Colours by name, split by commas.</p>
+    </div>
+    <form id="v2-rules" style="display: grid; gap: 8px">
+      <label class="row">Multiplier choices
+        <input id="multipliers" placeholder="2x, 0x, -1x"></label>
+      <label class="row">Token colours
+        <input id="v2-colours" placeholder="red, green, blue, yellow"></label>
+      <div class="row"><button class="primary">Save V2 rules</button></div>
+      <p>V2: each team gives zones 1, 2 and 3 a multiplier, shown on the phones
+        in the order typed here, and picks a decoy colour (worth -1 a token) and
+        a 2x colour (worth 2). Other colours are worth 1.</p>
     </form>
-    <p id="tokens-note">Colours the phones give points to, by name, split by commas.</p>
+    <p id="tokens-note"></p>
+  </section>
+  <section>
+    <div class="row" style="justify-content: space-between">
+      <h2>Score calculator</h2>
+      <button id="calc-clear">Clear tokens</button>
+    </div>
+    <p>Tokens of each colour in each zone. Scores update as you type.</p>
+    <div class="wide"><table id="calc"></table></div>
+    <p id="calc-note"></p>
+  </section>
+  <section>
     <div class="row" style="justify-content: space-between">
       <h2 id="count">Teams</h2>
       <button id="clear">Remove all teams</button>
@@ -97,6 +135,7 @@
     </table></div>
     <p id="topic"></p>
   </section>
+  </div>
 </main>
 <script src="dialogs.js"></script>
 <script>
@@ -132,32 +171,54 @@ function paint(state) {
   $("serving").textContent = state.serving ? ""
     : `Phone sign-up is off: ${state.error || "not started"}.`;
   $("serving").className = state.serving ? "" : "bad";
-  if (document.activeElement !== $("tokens")) {
-    $("tokens").value = state.tokens.join(", ");
+  const v2 = state.ruleset === "V2";
+  const typing = (id) => document.activeElement === $(id);
+  if (!typing("ruleset")) $("ruleset").value = state.ruleset;
+  $("v1-rules").classList.toggle("hidden", v2);
+  $("v2-rules").classList.toggle("hidden", !v2);
+  if (!typing("tokens")) $("tokens").value = state.tokens.join(", ");
+  if (!typing("multipliers")) {
+    $("multipliers").value = state.multipliers.map((m) => `${m}x`).join(", ");
   }
+  if (!typing("v2-colours")) $("v2-colours").value = state.v2_colours.join(", ");
+  paintCalc(state);
   $("count").textContent = `Teams (${state.teams.length})`;
   $("clear").disabled = !state.teams.length;
 
   const head = document.createElement("tr");
   head.append(cell("Team", "th"));
-  for (const colour of state.tokens) {
+  const columns = v2 ? ["Zone 1", "Zone 2", "Zone 3", "Decoy", "2x"] : state.tokens;
+  for (const name of columns) {
     const th = cell("", "th");
     th.className = "n";
-    const dot = document.createElement("i");
-    dot.className = "dot";
-    dot.style.background = colour;
-    th.append(dot, colour);
+    if (!v2) th.append(dot(name));
+    th.append(name);
     head.append(th);
   }
-  head.append(cell("Signed up", "th"), cell("", "th"));
+  const scoreHead = cell("Score", "th");
+  scoreHead.className = "n";
+  head.append(scoreHead, cell("Signed up", "th"), cell("", "th"));
   $("head").replaceChildren(head);
 
   const rows = state.teams.map((team) => {
     const tr = document.createElement("tr");
     tr.append(cell(team.name));
-    for (const colour of state.tokens) {
-      tr.append(cell(team.points[colour] ?? 0, "n"));
+    if (v2) {
+      const picks = team.picks;
+      for (const m of picks ? picks.zones : [null, null, null]) {
+        tr.append(cell(m === null ? "–" : `${m}x`, "n"));
+      }
+      for (const colour of picks ? [picks.decoy, picks.double] : [null, null]) {
+        const td = cell("", "n");
+        if (colour) td.append(dot(colour), colour); else td.textContent = "–";
+        tr.append(td);
+      }
+    } else {
+      for (const colour of state.tokens) {
+        tr.append(cell((team.points || {})[colour] ?? 0, "n"));
+      }
     }
+    tr.append(cell(team.score ?? "not set", "n score"));
     tr.append(cell(new Date(team.updated * 1000).toLocaleTimeString()));
     const remove = document.createElement("button");
     remove.textContent = "Remove";
@@ -174,12 +235,87 @@ function paint(state) {
   if (!rows.length) {
     const tr = document.createElement("tr");
     const td = cell("No teams yet. Scan the code with a phone to sign one up.");
-    td.colSpan = state.tokens.length + 3;
+    td.colSpan = columns.length + 4;
     tr.append(td);
     rows.push(tr);
   }
   $("list").replaceChildren(...rows);
   $("topic").textContent = `Published on ${state.topic} for ROS nodes.`;
+}
+
+function dot(colour) {
+  const i = document.createElement("i");
+  i.className = "dot";
+  i.style.background = colour;
+  return i;
+}
+
+function paintCalc(state) {
+  const key = JSON.stringify([state.colours, state.zones]);
+  const table = $("calc");
+  if (table.dataset.key !== key) {
+    table.dataset.key = key;
+    const head = document.createElement("tr");
+    head.append(cell("Zone", "th"));
+    for (const colour of state.colours) {
+      const th = cell("", "th");
+      th.className = "n";
+      th.append(dot(colour), colour);
+      head.append(th);
+    }
+    const rows = state.zones.map((zone) => {
+      const tr = document.createElement("tr");
+      tr.append(cell(`Zone ${zone}`));
+      for (const colour of state.colours) {
+        const input = document.createElement("input");
+        input.type = "number"; input.min = 0; input.max = state.max_count;
+        input.dataset.zone = zone; input.dataset.colour = colour;
+        input.setAttribute("aria-label", `Zone ${zone} ${colour} tokens`);
+        input.addEventListener("input", sendCounts);
+        const td = cell("", "n");
+        td.append(input);
+        tr.append(td);
+      }
+      return tr;
+    });
+    table.replaceChildren(head, ...rows);
+  }
+  if (table.contains(document.activeElement)) return;
+  for (const input of table.querySelectorAll("input")) {
+    const count = (state.counts[input.dataset.zone] || {})[input.dataset.colour];
+    input.value = count || "";
+  }
+}
+
+let countTimer = null;
+function sendCounts() {
+  clearTimeout(countTimer);
+  countTimer = setTimeout(async () => {
+    const counts = {};
+    for (const input of $("calc").querySelectorAll("input")) {
+      const zone = (counts[input.dataset.zone] ||= {});
+      zone[input.dataset.colour] = input.value;
+    }
+    try {
+      paint(await call("/api/teams/counts", { counts }));
+      $("calc-note").textContent = "";
+    } catch (error) {
+      $("calc-note").textContent = error.message;
+      $("calc-note").className = "bad";
+    }
+  }, 250);
+}
+
+async function rules(body, saved) {
+  try {
+    paint(await call("/api/teams/rules", body));
+    $("tokens-note").textContent = saved;
+    $("tokens-note").className = "";
+    document.activeElement.blur();
+  } catch (error) {
+    $("tokens-note").textContent = error.message;
+    $("tokens-note").className = "bad";
+  }
 }
 
 async function poll() {
@@ -199,6 +335,18 @@ $("tokens-form").addEventListener("submit", async (event) => {
     $("tokens-note").textContent = error.message;
     $("tokens-note").className = "bad";
   }
+});
+$("ruleset").addEventListener("change", () => rules(
+  { ruleset: $("ruleset").value },
+  `Ruleset ${$("ruleset").value}. Phones see it when they reload.`));
+$("v2-rules").addEventListener("submit", (event) => {
+  event.preventDefault();
+  rules({ multipliers: $("multipliers").value, colours: $("v2-colours").value },
+        "Saved. Phones see the new choices when they reload.");
+});
+$("calc-clear").addEventListener("click", async () => {
+  if (!await askYes("Clear every zone's tokens?", "Clear", true)) return;
+  try { paint(await call("/api/teams/counts", { counts: {} })); } catch (error) {}
 });
 $("clear").addEventListener("click", async () => {
   if (!await askYes("Remove every team?", "Remove all", true)) return;

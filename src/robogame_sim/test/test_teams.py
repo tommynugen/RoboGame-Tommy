@@ -125,3 +125,41 @@ def test_phone_sign_up_reaches_the_teams_tab():
     finally:
         app.shutdown()
         store.stop()
+
+
+def test_v2_zone_ruleset_scores(tmp_path):
+    store = teams.Teams(path=str(tmp_path / "teams.json"))
+    published = []
+    store.publish = published.append
+    v1 = store.sign_up({"name": "Old", "points": {"red": 5}})
+    store.set_rules({"ruleset": "V2", "multipliers": "-1x, 0x, 2x"})
+    assert store.multipliers == [-1, 0, 2]  # the phones' display order
+    one = store.sign_up({"name": "One", "picks": {
+        "zones": [2, -1, 0], "decoy": "blue", "double": "red"}})
+    store.sign_up({"name": "Two", "picks": {
+        "zones": ["0x", "2x", "-1x"], "decoy": "red", "double": "green"}})
+    for bad in ({"zones": [2, 2], "decoy": "red", "double": "blue"},
+                {"zones": [3, 0, 0], "decoy": "red", "double": "blue"},
+                {"zones": [2, 0, -1], "decoy": "red", "double": "red"},
+                {"zones": [2, 0, -1], "decoy": "pink", "double": "red"}):
+        with pytest.raises(ValueError):
+            store.sign_up({"name": "Bad", "picks": bad})
+    # 2 red in zone 1, 1 blue in zone 2, zone 3 empty.
+    store.set_counts({"1": {"red": 2}, "2": {"blue": "1"}, "3": {}})
+    scores = {t["name"]: t["score"] for t in store.state()["teams"]}
+    # One: red is 2x in a 2x zone (2*2*2), blue decoy in a -1x zone
+    # (1*-1*-1). Two: red decoy in a 0x zone, blue (worth 1) in a 2x zone.
+    assert scores == {"Old": None, "One": 9, "Two": 2}
+    assert json.loads(published[-1])["teams"][1]["score"] == 9
+    with pytest.raises(ValueError):
+        store.set_counts({"1": {"red": -1}})
+    with pytest.raises(ValueError):
+        store.set_rules({"multipliers": "lots"})
+    # V1 still scores by points per colour; V2 picks are kept.
+    store.set_rules({"ruleset": "V1"})
+    assert store.state()["teams"][0]["score"] == 10
+    assert store.teams[one["id"]]["picks"]["double"] == "red"
+    again = teams.Teams(path=str(tmp_path / "teams.json"))
+    assert again.multipliers == [-1, 0, 2]
+    assert again.counts == {"1": {"red": 2}, "2": {"blue": 1}}
+    assert again.teams[v1["id"]]["points"]["red"] == 5
