@@ -47,7 +47,57 @@ and each arm command moves the shoulder or elbow 5 degrees, clamped to 0 to
   A gentle curve such as 0.1 m/s and 0.3 rad/s becomes a near pivot at
   about 5 rad/s, which is how a real robot will react too.
 
-## Setup
+## Install
+
+One command per system. Each installs everything the Gamemaster needs,
+builds it and adds it to the app menu (Start menu on Windows). Run it
+again to update.
+
+| System | ROS 2 | What works |
+| --- | --- | --- |
+| Ubuntu 26.04 | Lyrical, Gazebo Jetty | everything (what the sim is built and checked on) |
+| Ubuntu 24.04 | Jazzy, Gazebo Harmonic | everything but the Camera view card (Qt 6); sim not yet checked |
+| Ubuntu 22.04 | Humble, no Gazebo | the app, real robots and the BLE bridge; no Gazebo sim |
+| Any Linux, `--no-ros` | none | editor, Setup, Vision, Teams, 2D chase, Logs |
+| Windows 10 or 11 | none | the same as `--no-ros` |
+
+Ubuntu (asks for your password once):
+
+```
+curl -fsSL https://raw.githubusercontent.com/tommynugen/RoboGames-Fall-2026/main/install.sh | bash
+```
+
+or `./install.sh` in a checkout. It adds the ROS apt source if there is
+none, installs `ros-DISTRO-ros-base`, `ros-gz` (24.04 and up), `joy`,
+`ros-dev-tools`, OpenCV, pywebview and `cloudflared`, clones the repo to
+`~/RoboGames-Fall-2026` (or uses the checkout it is in), builds it, and
+runs `scripts/desktop/install.sh`. Options: `--ros DISTRO`, `--no-ros`
+(a `.venv` with pip instead of ROS), `--dir PATH`, `--no-cloudflared`,
+`--no-menu`. The app menu entry finds whichever ROS is installed, or runs
+without ROS from the `.venv`.
+
+Windows: double-click `install-windows.cmd`, or in PowerShell:
+
+```
+irm https://raw.githubusercontent.com/tommynugen/RoboGames-Fall-2026/main/install.ps1 | iex
+```
+
+No admin rights needed. It installs Python 3.12 with winget if there is
+no Python 3.10 or newer, puts the app in `%LOCALAPPDATA%\RoboGame`, makes a
+venv with numpy, OpenCV and pywebview, installs `cloudflared` with winget,
+and adds Start menu and desktop shortcuts. Saved layouts go to
+`%LOCALAPPDATA%\RoboGame\layouts`, so an update keeps them. The robot
+console, BLE bridge and Gazebo need ROS 2, which Windows does not get here.
+
+With nothing installed at all, the one-file web version
+(`robogame-gamemaster.html`) opens in any browser.
+
+The `install` GitHub workflow runs both installers on fresh Ubuntu 22.04,
+24.04 and 26.04, Linux without ROS, and Windows, and starts the app on
+each. (Checked 2026-11-19: `install.sh --no-ros` here, and the app starts
+from its venv without ROS; the other runs are in the workflow.)
+
+## Setup by hand
 
 This runs on ROS 2 Lyrical, not the Jazzy the repo targets, and so on
 Gazebo Jetty (gz-sim 10). Gazebo comes with `ros_gz`:
