@@ -48,6 +48,8 @@ import subprocess
 import threading
 import time
 
+from robogame_sim import process_group
+
 TAGS_TOPIC = "/arena/tags"
 CORNER_TAGS = (1, 2, 3, 4)
 FILE_NAME = "tag_robots.json"
@@ -330,10 +332,10 @@ class NodeRunner:
         if process is None or process.poll() is not None:
             return self.status()
         try:
-            os.killpg(process.pid, signal.SIGINT)
+            process_group.signal_group(process.pid, signal.SIGINT)
             process.wait(STOP_WAIT)
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
+            process_group.signal_group(process.pid, process_group.KILL)
             process.wait()
         except ProcessLookupError:
             pass

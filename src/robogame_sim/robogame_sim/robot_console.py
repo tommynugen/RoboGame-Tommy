@@ -57,7 +57,7 @@ from robogame_sim import arena_layout, autopilot, pairing
 from robogame_sim.active_arena import LATCHED, TOPIC as ARENA_TOPIC
 from robogame_sim.autopilot import Autopilot
 from robogame_sim.chase import yaw_from_quaternion
-from robogame_sim.controller_robots import die_with_parent, executable
+from robogame_sim.controller_robots import child_options, executable
 from robogame_sim.robot_sdf import COLOURS
 from robogame_sim.terrain import HALF_LENGTH, HALF_WIDTH, Terrain
 
@@ -681,7 +681,7 @@ class RobotConsole(Node):
         self.manager_process = subprocess.Popen(
             [executable("robogame_sim", "controller_robots"),
              "--ros-args", "-p", "real:=true"],
-            preexec_fn=die_with_parent)
+            **child_options())
         self.get_logger().info("Started controller_robots for real robots")
 
     def stop_manager(self):

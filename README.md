@@ -58,8 +58,10 @@ again to update.
 | Ubuntu 26.04 | Lyrical, Gazebo Jetty | everything (what the sim is built and checked on) |
 | Ubuntu 24.04 | Jazzy, Gazebo Harmonic | everything but the Camera view card (Qt 6); sim not yet checked |
 | Ubuntu 22.04 | Humble, no Gazebo | the app, real robots and the BLE bridge; no Gazebo sim |
+| Arch Linux | Lyrical in an Ubuntu 26.04 distrobox (`--arch4edu`: ROS 2 from arch4edu, no Gazebo) | as Ubuntu 26.04; BLE inside the box not yet checked |
 | Any Linux, `--no-ros` | none | editor, Setup, Vision, Teams, 2D chase, Logs |
-| Windows 10 or 11 | none | the same as `--no-ros` |
+| Windows 11 | Lyrical (official binary, pixi) | the app and the robot console; no Gazebo or gamepads |
+| Windows 10, or `ROBOGAME_NO_ROS=1` | none | the same as `--no-ros` |
 
 Ubuntu (asks for your password once):
 
@@ -67,11 +69,31 @@ Ubuntu (asks for your password once):
 curl -fsSL https://raw.githubusercontent.com/tommynugen/Robogame-Tommy/main/install.sh | bash
 ```
 
-or `./install.sh` in a checkout. It adds the ROS apt source if there is
+or `./install.sh` in a checkout. On Arch it installs distrobox and
+podman with pacman, makes an Ubuntu 26.04 box named `robogame`, runs
+itself inside it (home is shared, so the repo and build are the same
+folder), and the menu entry starts the app with `distrobox enter
+robogame --`. `--box` does the same on Fedora or any Linux with
+distrobox. `--arch4edu` instead adds the arch4edu repo (its key from a
+key server, or its keyring package checked by hash) and installs the
+newest `ros2-DISTRO-base` it has, on Arch itself: the app, the console
+and real robots, but no Gazebo. On Ubuntu it adds the ROS apt source if there is
 none, installs `ros-DISTRO-ros-base`, `ros-gz` (24.04 and up), `joy`,
 `ros-dev-tools`, OpenCV, pywebview and `cloudflared`, clones the repo to
 `~/Robogame-Tommy` (or uses the checkout it is in), builds it, and
-runs `scripts/desktop/install.sh`. Options: `--ros DISTRO`, `--no-ros`
+runs `scripts/desktop/install.sh`.
+
+Before Gazebo it asks "Install Gazebo to simulate the RoboGame?", says
+what Gazebo is for (launching arenas from the editor, simulated robots,
+trying the chase without the real arena) and how much disk it needs. On
+Ubuntu the sizes come from apt; on 26.04 ROS 2 takes about 0.8 GB and
+Gazebo about 2 GB more. On Arch, yes means the distrobox (about 6 GB in
+all) and no means arch4edu (about 1.9 GB, no Gazebo). `--sim` or
+`--no-sim` answers it ahead, and with no terminal to ask (as in CI)
+it says yes. Run it again with `--sim` to add
+Gazebo later.
+
+Options: `--ros DISTRO`, `--sim`, `--no-sim`, `--no-ros`
 (a `.venv` with pip instead of ROS), `--dir PATH`, `--no-cloudflared`,
 `--no-menu`. The app menu entry finds whichever ROS is installed, or runs
 without ROS from the `.venv`.
@@ -82,20 +104,30 @@ Windows: double-click `install-windows.cmd`, or in PowerShell:
 irm https://raw.githubusercontent.com/tommynugen/Robogame-Tommy/main/install.ps1 | iex
 ```
 
-No admin rights needed. It installs Python 3.12 with winget if there is
+No admin rights needed. On Windows 11 it installs ROS 2 Lyrical as the
+ROS docs do: pixi, the newest Lyrical Windows zip from
+github.com/ros2/ros2/releases unpacked to `C:\dev\lyrical`, `pixi install`
+and its `preinstall_setup_windows.py`, then builds `robogame_sim` there
+with colcon. The robot console then drives robots whose sim or bridge
+runs on this or another computer on the same network. Gazebo, the
+Camera view card and gamepads (Linux joydev) stay Linux only. Set
+`$env:ROBOGAME_NO_ROS = 1` first to skip ROS. Either way it installs Python 3.12 with winget if there is
 no Python 3.10 or newer, puts the app in `%LOCALAPPDATA%\RoboGame`, makes a
 venv with numpy, OpenCV and pywebview, installs `cloudflared` with winget,
 and adds Start menu and desktop shortcuts. Saved layouts go to
-`%LOCALAPPDATA%\RoboGame\layouts`, so an update keeps them. The robot
-console, BLE bridge and Gazebo need ROS 2, which Windows does not get here.
+`%LOCALAPPDATA%\RoboGame\layouts`, so an update keeps them. The
+processes the app starts are stopped with `taskkill /T` on Windows
+(`process_group.py`), as Windows has no process groups.
 
 With nothing installed at all, the one-file web version
 (`robogame-gamemaster.html`) opens in any browser.
 
 The `install` GitHub workflow runs both installers on fresh Ubuntu 22.04,
 24.04 and 26.04, Linux without ROS, and Windows, and starts the app on
-each. (Checked 2026-11-19: `install.sh --no-ros` here, and the app starts
-from its venv without ROS; the other runs are in the workflow.)
+each. (Checked 2026-11-19: all of these in the workflow, the app answering
+`/api/app` on each, with the robot console on wherever ROS is.) (Checked 2026-11-19 in the same workflow: apt sizes on 26.04, ROS 2
+Lyrical 818 MB and Gazebo 1952 MB more; arch4edu's three pacman steps
+157, 225 and 1481 MiB. The Arch distrobox size is an estimate.)
 
 ## Setup by hand
 

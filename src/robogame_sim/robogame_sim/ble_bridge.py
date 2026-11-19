@@ -27,6 +27,8 @@ import signal
 import subprocess
 import threading
 
+from robogame_sim import process_group
+
 STOP_WAIT = 5.0  # s, from Ctrl-C to SIGKILL
 
 # What ble_fleet.py, ble_link.py and microcontroller_node.py print, as of
@@ -157,10 +159,10 @@ class BridgeRunner:
         if process is None or process.poll() is not None:
             return self.status()
         try:
-            os.killpg(process.pid, signal.SIGINT)
+            process_group.signal_group(process.pid, signal.SIGINT)
             process.wait(STOP_WAIT)
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
+            process_group.signal_group(process.pid, process_group.KILL)
             process.wait()
         except ProcessLookupError:
             pass

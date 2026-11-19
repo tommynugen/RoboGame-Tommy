@@ -33,6 +33,7 @@ import tempfile
 import threading
 import time
 
+from robogame_sim import process_group
 from robogame_sim import arena_layout
 from robogame_sim.sim_camera import SimCamera
 
@@ -125,10 +126,10 @@ class SimRunner:
                 return self.status()
             self.stopped = True
             try:
-                os.killpg(process.pid, signal.SIGINT)
+                process_group.signal_group(process.pid, signal.SIGINT)
                 process.wait(STOP_WAIT)
             except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
+                process_group.signal_group(process.pid, process_group.KILL)
                 process.wait()
             except ProcessLookupError:
                 pass

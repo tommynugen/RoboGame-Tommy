@@ -37,6 +37,7 @@ import tempfile
 import threading
 import time
 
+from robogame_sim import process_group
 from robogame_sim import arena_layout
 from robogame_sim.chase_sim import BEHAVIOURS
 
@@ -108,10 +109,10 @@ class Job:
             return
         self.stopped = True
         try:
-            os.killpg(process.pid, sig)
+            process_group.signal_group(process.pid, sig)
             process.wait(STOP_WAIT)
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
+            process_group.signal_group(process.pid, process_group.KILL)
             process.wait()
         except ProcessLookupError:
             pass
@@ -295,10 +296,10 @@ class ChaseRunner:
                 pids = [int(p) for p in file.read().split()]
         except (OSError, ValueError):
             return
-        for sig in (signal.SIGINT, signal.SIGKILL):
+        for sig in (signal.SIGINT, process_group.KILL):
             for pid in pids:
                 try:
-                    os.killpg(pid, sig)
+                    process_group.signal_group(pid, sig)
                 except (ProcessLookupError, PermissionError):
                     pass
             if sig == signal.SIGINT:
@@ -311,7 +312,7 @@ class ChaseRunner:
             self.flat.stop()
         if kind in (None, "gazebo") and self.gazebo.running():
             # The suite's shell waits on its runs; no need to be kind.
-            self.gazebo.stop(signal.SIGKILL)
+            self.gazebo.stop(process_group.KILL)
             if kind is None:
                 self.end_launches()
             else:
