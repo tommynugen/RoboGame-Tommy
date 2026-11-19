@@ -1,5 +1,6 @@
 # Runs the installers on fresh machines: Ubuntu 22.04, 24.04 and 26.04
-# with ROS, Arch with ROS from arch4edu and without ROS, ROS in a distrobox (as on Arch), Linux
+# with ROS, ROS in a distrobox (Arch's default), Arch with ROS from
+# arch4edu and without ROS, Linux
 # without ROS, and Windows with and without ROS. Each then starts the app
 # and asks it for /api/app.
 name: install
@@ -33,8 +34,8 @@ jobs:
     container: archlinux:latest
     steps:
       - uses: actions/checkout@v4
-      - name: install.sh (ROS 2 from arch4edu)
-        run: bash install.sh --no-menu --no-cloudflared
+      - name: install.sh --arch4edu (ROS 2 for Arch itself)
+        run: bash install.sh --arch4edu --no-menu --no-cloudflared
       - name: App starts with ROS
         shell: bash
         run: |

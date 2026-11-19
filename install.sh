@@ -10,13 +10,14 @@
 #   Ubuntu 26.04  ROS 2 Lyrical + Gazebo Jetty     (what the sim is built on)
 #   Ubuntu 24.04  ROS 2 Jazzy + Gazebo Harmonic    (no Camera view card)
 #   Ubuntu 22.04  ROS 2 Humble, no Gazebo sim      (editor, console, robots)
-#   Arch Linux    ROS 2 from arch4edu, no Gazebo   (editor, console, robots)
-#                 or --box: Ubuntu 26.04 in a distrobox (the same as 26.04)
+#   Arch Linux    Ubuntu 26.04 in a distrobox      (the same as 26.04)
+#                 or --arch4edu: ROS 2 for Arch itself, no Gazebo
 #
 # Options:
 #   --ros DISTRO       pick the ROS 2 distro yourself (lyrical, kilted, jazzy, humble)
-#   --box              ROS and Gazebo in an Ubuntu 26.04 distrobox (Arch, if
-#                      arch4edu has no ROS 2, Fedora, any Linux with distrobox)
+#   --box              ROS and Gazebo in an Ubuntu 26.04 distrobox (the default
+#                      on Arch; also Fedora or any Linux with distrobox)
+#   --arch4edu         Arch: ROS 2 from the arch4edu repo instead, no Gazebo
 #   --no-ros           no ROS at all: the app in a Python venv, for any Linux
 #                      (editor, vision, teams and chase tabs; no robot console)
 #   --dir PATH         where to put the repo (default ~/Robogame-Tommy)
@@ -38,6 +39,7 @@ while [ $# -gt 0 ]; do
         --ros) distro="$2"; shift ;;
         --no-ros) no_ros=1 ;;
         --box) box=1 ;;
+        --arch4edu) arch_ros=1 ;;
         --dir) dir="$2"; shift ;;
         --no-cloudflared) cloudflared=0 ;;
         --no-menu) menu=0 ;;
@@ -86,15 +88,15 @@ if [ "$no_ros" = 0 ] && [ "$box" = 0 ] && [ -z "$distro" ]; then
         ubuntu:26.04) distro=lyrical ;;
         ubuntu:24.04) distro=jazzy ;;
         ubuntu:22.04) distro=humble ;;
-        *) if [ "$is_arch" = 1 ]; then arch_ros=1
+        *) if [ "$is_arch" = 1 ]; then [ "${arch_ros:-0}" = 1 ] || box=1
            else die "No ROS 2 packages for ${PRETTY_NAME:-this system}. Run again with --box (ROS in an Ubuntu distrobox) or --no-ros (the app without ROS)."
            fi ;;
     esac
 fi
 arch_ros="${arch_ros:-0}"
 
-# Arch: ROS 2 binaries from arch4edu (github.com/arch4edu/arch4edu), the
-# newest distro it has. If it has none, ROS goes in a distrobox instead.
+# Arch with --arch4edu: ROS 2 binaries from arch4edu (github.com/arch4edu/arch4edu),
+# the newest distro it has. If it has none, ROS goes in a distrobox instead.
 if [ "$arch_ros" = 1 ]; then
     step "arch4edu (ROS 2 for Arch)"
     if ! grep -q '^\[arch4edu\]' /etc/pacman.conf; then
@@ -136,7 +138,7 @@ elif [ "$no_ros" = 1 ]; then
 else
     echo "Installing RoboGame Gamemaster on ${PRETTY_NAME:-Linux} with ROS 2 ${distro^}."
     if [ "$arch_ros" = 1 ]; then
-        warn "No Gazebo sim from arch4edu; run with --box for ROS and Gazebo in an Ubuntu distrobox."
+        warn "No Gazebo sim from arch4edu; run without --arch4edu for ROS and Gazebo in an Ubuntu distrobox."
     else
         [ "$sim" = 1 ] || warn "The Gazebo sim needs Ubuntu 24.04 or newer; Humble gets the app without it."
         [ "$pm" = apt ] || die "ROS 2 packages need Ubuntu; use --box or --no-ros here."

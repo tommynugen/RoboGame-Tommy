@@ -58,7 +58,7 @@ again to update.
 | Ubuntu 26.04 | Lyrical, Gazebo Jetty | everything (what the sim is built and checked on) |
 | Ubuntu 24.04 | Jazzy, Gazebo Harmonic | everything but the Camera view card (Qt 6); sim not yet checked |
 | Ubuntu 22.04 | Humble, no Gazebo | the app, real robots and the BLE bridge; no Gazebo sim |
-| Arch Linux (or `--box` elsewhere) | Lyrical in an Ubuntu 26.04 distrobox | as Ubuntu 26.04; BLE inside the box not yet checked |
+| Arch Linux | Lyrical in an Ubuntu 26.04 distrobox (`--arch4edu`: ROS 2 from arch4edu, no Gazebo) | as Ubuntu 26.04; BLE inside the box not yet checked |
 | Any Linux, `--no-ros` | none | editor, Setup, Vision, Teams, 2D chase, Logs |
 | Windows 11 | Lyrical (official binary, pixi) | the app and the robot console; no Gazebo or gamepads |
 | Windows 10, or `ROBOGAME_NO_ROS=1` | none | the same as `--no-ros` |
@@ -74,7 +74,10 @@ podman with pacman, makes an Ubuntu 26.04 box named `robogame`, runs
 itself inside it (home is shared, so the repo and build are the same
 folder), and the menu entry starts the app with `distrobox enter
 robogame --`. `--box` does the same on Fedora or any Linux with
-distrobox. On Ubuntu it adds the ROS apt source if there is
+distrobox. `--arch4edu` instead adds the arch4edu repo (its key from a
+key server, or its keyring package checked by hash) and installs the
+newest `ros2-DISTRO-base` it has, on Arch itself: the app, the console
+and real robots, but no Gazebo. On Ubuntu it adds the ROS apt source if there is
 none, installs `ros-DISTRO-ros-base`, `ros-gz` (24.04 and up), `joy`,
 `ros-dev-tools`, OpenCV, pywebview and `cloudflared`, clones the repo to
 `~/Robogame-Tommy` (or uses the checkout it is in), builds it, and
