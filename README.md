@@ -1173,7 +1173,11 @@ ros2 run robogame_sim robogame_gamemaster
 ```
 
 It opens the RoboGame Gamemaster (http://localhost:8766) in its own window, on its
-Arena editor tab (see Robot console for the app itself). Pick a module (keys 1
+Arena editor tab (see Robot console for the app itself). The editor starts
+on a blank map named `new`; pick a saved layout from Open to change it, or
+add modules and Save under a name of your own. (Checked 2026-11-19: tests,
+and the shared editor in headless Chromium opened on an empty grid with
+Open blank.) Pick a module (keys 1
 to 5) and click or drag on the grid, which is seen from above with +x to
 the right and +y up, each square drawn with its tile's four peg holes.
 The module goes where the pointer is, to the nearest half square; turn off

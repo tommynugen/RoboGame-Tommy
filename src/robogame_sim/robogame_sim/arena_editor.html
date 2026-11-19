@@ -292,7 +292,7 @@
   </div>
   <div class="field">
     <label for="name">Name</label>
-    <input id="name" type="text" value="default" spellcheck="false"
+    <input id="name" type="text" value="new" spellcheck="false"
            autocomplete="off" title="Letters, digits, spaces, - and _;
 the file has - for spaces">
   </div>
@@ -2173,12 +2173,13 @@ async function restorePart(archived, part, cad) {
   try {
     const layouts = await refreshSaved();
     const asked = decodeURIComponent(location.hash.slice(1));
-    const first = layouts.includes(asked) ? asked
-      : layouts.includes("default") ? "default" : layouts[0];
+    // With no layout named in the address, start on a blank map.
+    const first = layouts.includes(asked) ? asked : null;
     if (first) {
       savedEl.value = first;
       await openLayout(first);
     } else {
+      savedEl.value = "";
       savedSnapshot = snapshot();
       changed();
     }
