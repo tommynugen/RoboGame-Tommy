@@ -73,6 +73,21 @@
   #calc input { width: 64px; text-align: right; }
   td.score { font-weight: 700; }
   .hidden { display: none !important; }
+  td.masked { color: var(--muted); letter-spacing: 2px; }
+  /* Show QR code: the code alone, filling the screen, for a projector. */
+  #big {
+    position: fixed; inset: 0; z-index: 50; background: #fff; color: #111;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2vh; padding: 3vh 16px; cursor: pointer;
+  }
+  #big h1 { margin: 0; font-size: clamp(22px, 5vh, 56px); }
+  #big img { width: min(70vh, 92vw); height: auto; }
+  #big .u { font: clamp(16px, 3vh, 32px) ui-monospace, monospace; word-break: break-all;
+            text-align: center; }
+  #big .names { font-size: clamp(14px, 2.4vh, 26px); color: #444; text-align: center;
+                max-width: 90vw; }
+  #big .close { position: absolute; top: 12px; right: 16px; background: #fff;
+                color: #111; border-color: #bbb; }
 </style>
 </head>
 <body>
@@ -81,6 +96,7 @@
     <h2>Scan to sign up</h2>
     <div id="qr"><img alt="QR code for the sign-up page" src="/api/teams/qr.svg"></div>
     <div id="url"></div>
+    <button class="primary" id="show-qr">Show QR code</button>
     <p id="serving"></p>
     <label class="row"><input type="checkbox" id="public"> Public link,
       for phones on any network</label>
@@ -130,7 +146,11 @@
   <section>
     <div class="row" style="justify-content: space-between">
       <h2 id="count">Teams</h2>
-      <button id="clear">Remove all teams</button>
+      <div class="row">
+        <button id="hide" aria-pressed="false"
+          title="Hide each team's picks and scores, so the screen can be shown">Hide picks</button>
+        <button id="clear">Remove all teams</button>
+      </div>
     </div>
     <div class="wide"><table>
       <thead id="head"></thead>
@@ -140,12 +160,24 @@
   </section>
   </div>
 </main>
+<div id="big" class="hidden" role="dialog" aria-label="Sign-up QR code">
+  <button class="close" id="big-close">Close (Esc)</button>
+  <h1>Scan to sign up your team</h1>
+  <img alt="QR code for the sign-up page">
+  <div class="u"></div>
+  <div class="names"></div>
+</div>
 <script src="dialogs.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 let last = null;
 let shownUrl = null;
 let busy = false;  // a Public link switch is on its way
+// Hide picks: team names stay, their picks and scores show as dots. Kept in
+// this browser only, so a reload stays hidden.
+let hidePicks = false;
+try { hidePicks = localStorage.getItem("teams.hide") === "1"; } catch (e) {}
+const MASK = "•••";
 
 async function call(path, body) {
   const reply = await fetch(path, {
@@ -190,6 +222,9 @@ function paint(state) {
   }
   if (!typing("v2-colours")) $("v2-colours").value = state.v2_colours.join(", ");
   paintCalc(state);
+  paintBig(state);
+  $("hide").textContent = hidePicks ? "Show picks" : "Hide picks";
+  $("hide").setAttribute("aria-pressed", String(hidePicks));
   $("count").textContent = `Teams (${state.teams.length})`;
   $("clear").disabled = !state.teams.length;
 
@@ -211,7 +246,9 @@ function paint(state) {
   const rows = state.teams.map((team) => {
     const tr = document.createElement("tr");
     tr.append(cell(team.name));
-    if (v2) {
+    if (hidePicks) {
+      for (let i = 0; i < columns.length; i++) tr.append(cell(MASK, "n masked"));
+    } else if (v2) {
       const picks = team.picks;
       for (const m of picks ? picks.zones : [null, null, null]) {
         tr.append(cell(m === null ? "–" : `${m}x`, "n"));
@@ -226,7 +263,8 @@ function paint(state) {
         tr.append(cell((team.points || {})[colour] ?? 0, "n"));
       }
     }
-    tr.append(cell(team.score ?? "not set", "n score"));
+    tr.append(hidePicks ? cell(MASK, "n masked")
+                        : cell(team.score ?? "not set", "n score"));
     tr.append(cell(new Date(team.updated * 1000).toLocaleTimeString()));
     const remove = document.createElement("button");
     remove.textContent = "Remove";
@@ -249,6 +287,22 @@ function paint(state) {
   }
   $("list").replaceChildren(...rows);
   $("topic").textContent = `Published on ${state.topic} for ROS nodes.`;
+}
+
+function paintBig(state) {
+  const big = $("big");
+  const img = big.querySelector("img");
+  const src = `/api/teams/qr.svg?u=${encodeURIComponent(state.url)}`;
+  if (img.getAttribute("src") !== src) img.setAttribute("src", src);
+  big.querySelector(".u").textContent = state.url;
+  big.querySelector(".names").textContent = state.teams.length
+    ? `Signed up: ${state.teams.map((t) => t.name).join(", ")}` : "";
+}
+
+function showBig(on) {
+  $("big").classList.toggle("hidden", !on);
+  if (on && $("big").requestFullscreen) $("big").requestFullscreen().catch(() => {});
+  if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
 }
 
 function dot(colour) {
@@ -367,6 +421,19 @@ $("public").addEventListener("change", async () => {
     busy = false;
     paint(state);
   } catch (error) { busy = false; $("public-note").textContent = error.message; }
+});
+$("hide").addEventListener("click", () => {
+  hidePicks = !hidePicks;
+  try { localStorage.setItem("teams.hide", hidePicks ? "1" : "0"); } catch (e) {}
+  if (last) paint(last);
+});
+$("show-qr").addEventListener("click", () => showBig(true));
+$("big").addEventListener("click", () => showBig(false));
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") showBig(false);
+});
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement) $("big").classList.add("hidden");
 });
 poll();
 </script>
