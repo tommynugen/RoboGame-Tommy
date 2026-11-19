@@ -510,6 +510,17 @@ points of the colours that stay. Teams and colours are kept in
 `~/.local/share/robogame_sim/teams.json`, so a restart keeps them, and
 each sign-up or change goes to the Logs tab's Teams source.
 
+To show the sign-up code to a room without giving away anyone's picks,
+Hide picks (beside Remove all teams) keeps the team names but shows each
+team's points or V2 picks, and its score, as dots; Show picks brings them
+back. The choice is kept in that browser, so a reload stays hidden. Show
+QR code fills the screen with the code, the sign-up address and the names
+signed up so far, for a projector; Esc or a click closes it.
+
+Checked 2026-11-19: both buttons in Chromium (Playwright) without ROS,
+with a phone sign-up over HTTP: the row showed dots, stayed hidden after a
+reload, and the full-screen code closed on Esc.
+
 ### Rulesets and the score calculator
 
 The tab's Ruleset picks how teams score. V1 is the points per token
